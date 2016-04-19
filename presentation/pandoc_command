@@ -1,0 +1,2 @@
+pandoc -t revealjs -s final_present.md -o arterial.html --standalone --slide-level=2 -V theme=swisscoffee -S
+

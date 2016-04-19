@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="author" content="James E. Marca" />
+  <meta name="dcterms.date" content="2016-04-20" />
+  <title>That SQL looks pretty complicated. Where are the tests?</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="reveal.js/css/reveal.css"/>
+  <style type="text/css">code{white-space: pre;}</style>
+  <style type="text/css">
+div.sourceCode { overflow-x: auto; }
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code > span.dt { color: #902000; } /* DataType */
+code > span.dv { color: #40a070; } /* DecVal */
+code > span.bn { color: #40a070; } /* BaseN */
+code > span.fl { color: #40a070; } /* Float */
+code > span.ch { color: #4070a0; } /* Char */
+code > span.st { color: #4070a0; } /* String */
+code > span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code > span.ot { color: #007020; } /* Other */
+code > span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code > span.fu { color: #06287e; } /* Function */
+code > span.er { color: #ff0000; font-weight: bold; } /* Error */
+code > span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+code > span.cn { color: #880000; } /* Constant */
+code > span.sc { color: #4070a0; } /* SpecialChar */
+code > span.vs { color: #4070a0; } /* VerbatimString */
+code > span.ss { color: #bb6688; } /* SpecialString */
+code > span.im { } /* Import */
+code > span.va { color: #19177c; } /* Variable */
+code > span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code > span.op { color: #666666; } /* Operator */
+code > span.bu { } /* BuiltIn */
+code > span.ex { } /* Extension */
+code > span.pp { color: #bc7a00; } /* Preprocessor */
+code > span.at { color: #7d9029; } /* Attribute */
+code > span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+  </style>
+  <link rel="stylesheet" href="reveal.js/css/theme/sky.css" id="theme">
+  <!-- If the query includes 'print-pdf', include the PDF print sheet -->
+  <script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+      var link = document.createElement( 'link' );
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = 'reveal.js/css/print/pdf.css';
+      document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+  </script>
+  <!--[if lt IE 9]>
+  <script src="reveal.js/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+<section>
+    <h1 class="title">That SQL looks pretty complicated. Where are the tests?</h1>
+    <h2 class="author">James E. Marca</h2>
+    <h3 class="date">2016-04-20</h3>
+</section>
+
+<section id="overview" class="slide level1">
+<h1>Overview</h1>
+<ul>
+<li>Database tables are super useful</li>
+<li>But they can get a little messy</li>
+<li>and the SQL used to create them can get complex</li>
+</ul>
+</section>
+<section id="motivation-clean-up-and-test-sql" class="slide level1">
+<h1>Motivation: Clean up and test SQL</h1>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/detectors_on_map.png" alt="Urban area highways have loop detectors" /><figcaption>Urban area highways have loop detectors</figcaption>
+</figure>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/detectors_on_map_4.png" alt="Focusing on just the highways" /><figcaption>Focusing on just the highways</figcaption>
+</figure>
+</section>
+<section id="to-solve-this" class="slide level1">
+<h1>To solve this</h1>
+<figure>
+<img src="./figures/segmentation.png" alt="Segmentize points" /><figcaption>Segmentize points</figcaption>
+</figure>
+</section>
+<section id="i-wrote-this-sql" class="slide level1">
+<h1>I wrote this SQL</h1>
+<div class="sourceCode"><pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">INSERT</span> <span class="kw">INTO</span> osm_upgrade.vds_segment_geometry
+   (vds_id,adj_pm,refnum,direction,seggeom)
+<span class="kw">SELECT</span> vds_id,adj_pm,refnum,direction,seggeom
+<span class="kw">FROM</span> (
+  <span class="kw">SELECT</span> pdist,ptsec,ndist,vds_id,adj_pm,refnum,
+         relation_direction <span class="kw">as</span> direction,
+         <span class="co">-- vdsid, order, freeway id, freeway dir</span>
+
+         <span class="co">-- AND the computed segment geometry associated with the vds</span>
+         <span class="kw">CASE</span> <span class="kw">WHEN</span> ptsec &lt;= ntsec
+
+<span class="co">-- The previous vds comes before the next.</span>
+<span class="co">-- Create a line segment by taking the piece of the</span>
+<span class="co">-- route line between ptsec and ntsec</span>
+
+              <span class="kw">THEN</span> ST_line_substring( q.rls, ptsec,ntsec )
+
+              <span class="kw">ELSE</span>
+
+<span class="co">-- The &quot;previous&quot; vds comes /after/ the</span>
+<span class="co">-- &quot;next&quot;. Probably this means that they are pointing</span>
+<span class="co">-- at different line segments.  Hardcode to zero or one</span>
+
+                    <span class="kw">case</span>
+                      <span class="kw">WHEN</span> mydist &gt; pdist <span class="kw">then</span> ST_line_substring( q.rls, ptsec, <span class="dv">1</span> )
+                      <span class="kw">WHEN</span> mydist &lt; pdist <span class="kw">then</span> ST_line_substring( q.rls, <span class="dv">0</span>, ntsec )
+                    <span class="kw">end</span>
+            <span class="kw">END</span> <span class="kw">AS</span> seggeom
+       <span class="kw">FROM</span>
+       (
+
+<span class="co">-- here we select the points halfway between a target vds and the</span>
+<span class="co">-- vds&#39;s on either side of it (p=previous,n=next) along the route.  The</span>
+<span class="co">-- points are specified as the distance along the route linestring.</span>
+
+         <span class="kw">SELECT</span> vrr.vds_sequence_id <span class="kw">AS</span> sequence_id,
+                vrr.vds_id,vrr.adj_pm,vrr.refnum,vrr.relation_direction,
+                <span class="co">-- vdsid,pm, and osm relation</span>
+                vrr.line <span class="kw">AS</span> rls,        <span class="co">-- the linestring the vds snaps to</span>
+                vrr.dist <span class="kw">as</span> mydist,
+                vrr.numline <span class="kw">AS</span> myline,  <span class="co">-- to which multilines are we snapped?</span>
+                p.dist <span class="kw">AS</span> pdist,      <span class="co">-- the distance along the</span>
+                                      <span class="co">-- line of the previous vds</span>
+                <span class="kw">CASE</span> <span class="kw">WHEN</span> p.dist <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span>   <span class="co">-- this computes the bisection</span>
+                     <span class="kw">THEN</span> (vrr.dist+p.dist)/<span class="dv">2</span>  <span class="co">-- distance between the previous</span>
+                     <span class="kw">ELSE</span> <span class="dv">0</span>                    <span class="co">-- and target vds</span>
+                     <span class="kw">END</span> <span class="kw">AS</span> ptsec,
+                n.dist <span class="kw">AS</span> ndist,      <span class="co">-- the distance along the</span>
+                                      <span class="co">-- line of the next vds</span>
+                <span class="kw">CASE</span> <span class="kw">WHEN</span> n.dist <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span>   <span class="co">-- this computes the bisection</span>
+                     <span class="kw">THEN</span> (vrr.dist+n.dist)/<span class="dv">2</span>  <span class="co">-- distance between the target</span>
+                     <span class="kw">ELSE</span> <span class="dv">1</span>                    <span class="co">-- and next vds</span>
+                     <span class="kw">END</span> <span class="kw">AS</span> ntsec
+
+            <span class="kw">FROM</span> osm_upgrade.vds_route_relation vrr
+                 <span class="co">-- joining the previous vdsid</span>
+                 <span class="kw">LEFT</span> <span class="kw">JOIN</span> osm_upgrade.vds_route_relation p
+                      <span class="kw">ON</span> ( vrr.vds_sequence_id=p.vds_sequence_id<span class="dv">+1</span> <span class="kw">AND</span>
+                           vrr.refnum=p.refnum <span class="kw">AND</span>
+                           vrr.relation_direction=p.relation_direction <span class="kw">AND</span>
+                           vrr.numline=p.numline)
+                 <span class="co">-- and joining the next vdsid</span>
+                 <span class="kw">LEFT</span> <span class="kw">JOIN</span> osm_upgrade.vds_route_relation n
+                      <span class="kw">ON</span> ( n.vds_sequence_id=vrr.vds_sequence_id<span class="dv">+1</span> <span class="kw">AND</span>
+                           vrr.refnum=n.refnum <span class="kw">AND</span>
+                           vrr.relation_direction=n.relation_direction <span class="kw">AND</span>
+                           vrr.numline=n.numline)
+
+                 <span class="co">-- We need to the route line too as all our</span>
+                 <span class="co">-- computations are based upon that</span>
+                 <span class="kw">LEFT</span> <span class="kw">JOIN</span> tempseg.numbered_route_lines rl
+                      <span class="kw">ON</span> (rl.refnum=vrr.refnum <span class="kw">AND</span>
+                          vrr.relation_direction=rl.direction)
+                 <span class="co">-- WHERE</span>
+                 <span class="co">-- rl.refnum=99 and rl.direction=&#39;north&#39;</span>
+                 <span class="co">-- rl.refnum=580</span>
+            <span class="kw">ORDER</span> <span class="kw">BY</span> vrr.vds_sequence_id
+       ) q
+       <span class="kw">ORDER</span> <span class="kw">BY</span> sequence_id
+) qq <span class="kw">WHERE</span> geometrytype(seggeom) !~* <span class="st">&#39;point&#39;</span>
+;</code></pre></div>
+<p>… and several other files of similar functions.</p>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/brutti_ma_buoni__mg_9082-15.jpg" alt="Brutti ma buoni!" /><figcaption>“Brutti ma buoni!”</figcaption>
+</figure>
+</section>
+<section id="cant-test-that" class="slide level1">
+<h1>Can’t test that!</h1>
+</section>
+<section id="talk-objectives" class="slide level1">
+<h1>Talk objectives</h1>
+<ul>
+<li>Give real-world examples of using pgTAP and Sqitch</li>
+<li>Hoping others can learn from my mistakes.</li>
+</ul>
+</section>
+<section id="the-examples" class="slide level1">
+<h1>The examples</h1>
+<ol type="1">
+<li>Cleaning up after a SQL disaster</li>
+<li>Fixing a bad design choice (another SQL disaster)</li>
+<li>Modularizing, testing, and porting that monstrous SQL mapping hack</li>
+<li>Switching from OSM to official Caltrans map data</li>
+</ol>
+</section>
+<section id="about-me" class="slide level1">
+<h1>About me</h1>
+<ul>
+<li>James Marca</li>
+<li>Transportation Researcher at UC Irvine</li>
+<li>Activimetrics LLC</li>
+<li>twitter <span class="citation" data-cites="jmarca">@jmarca</span></li>
+<li>github https://github.com/jmarca</li>
+<li>occasional posts at https://contourline.wordpress.com</li>
+</ul>
+</section>
+<section id="my-postgresql-experience" class="slide level1">
+<h1>My PostgreSQL experience</h1>
+<ul>
+<li>Ever since 2001 (ish)</li>
+<li>Needed a geo-enabled DB</li>
+<li>MySQL didn’t at the time</li>
+<li>PostgreSQL had PostGIS</li>
+<li>Stored and processed streaming GPS data
+<ul>
+<li>(live, from cars, over a CDPD modem!)</li>
+</ul></li>
+</ul>
+</section>
+<section id="also" class="slide level1">
+<h1>Also</h1>
+<ul>
+<li>I set up Slashcode using PostgreSQL</li>
+<li>(That’s also how I learned Perl)</li>
+</ul>
+</section>
+<section id="acknowlegments" class="slide level1">
+<h1>Acknowlegments</h1>
+<p>Shout out to the agencies funding my research over the years</p>
+</section>
+<section id="caltrans" class="slide level1">
+<h1>Caltrans</h1>
+<h2 id="drisi-and-district-12">DRI/SI and District 12</h2>
+<p>Mission: Provide a safe, sustainable, integrated and efficient transportation system to enhance California’s economy and livability.</p>
+</section>
+<section id="california-air-resources-board" class="slide level1">
+<h1>California Air Resources Board</h1>
+<p>Mission: To promote and protect public health, welfare and ecological resources through the effective and efficient reduction of air pollutants while recognizing and considering the effects on the economy of the state.</p>
+</section>
+<section id="context" class="slide level1">
+<h1>Context</h1>
+</section>
+<section id="calvad-california-vehicle-activity-database" class="slide level1">
+<h1>CalVAD: California Vehicle Activity Database</h1>
+<p>Estimate, from data, vehicle movements on state roads and highways</p>
+</section>
+<section id="input-data-sources" class="slide level1">
+<h1>Input data sources</h1>
+<ul>
+<li>10,000+ inductive loop detectors (VDS)</li>
+<li>100+ Weigh In Motion (WIM) stations</li>
+<li>Estimated annual vehicle counts on every street</li>
+</ul>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="figures/ramp_loops.jpg" alt="Loop detector" /><figcaption>Loop detector</figcaption>
+</figure>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="figures/bendingplate.jpg" alt="WIM bending plate" /><figcaption>WIM bending plate</figcaption>
+</figure>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="figures/tube.scaled.jpeg" alt="pneumatic tubes for two-day counts" /><figcaption>pneumatic tubes for two-day counts</figcaption>
+</figure>
+</section>
+<section id="part-1-sql-disaster" class="slide level1">
+<h1>Part 1: SQL disaster</h1>
+</section>
+<section id="the-original-project-2002" class="slide level1">
+<h1>The original project (2002)</h1>
+<ul>
+<li>Q: “Can you display our safety model results on a map?”</li>
+<li>A: “Sure”</li>
+</ul>
+</section>
+<section id="vds-loop-data" class="slide level1">
+<h1>VDS Loop Data</h1>
+<pre class="csv"><code>ID,       Fwy,  Dir, District, County, City,  State_PM, Abs_PM, Latitude,  Longitude,   Length, Type, Lanes,    Name,    User_ID_1, User_ID_2, User_ID_3, User_ID_4
+1201044,  133,  S,     12,      59,    36770,  9,        8.991, 33.66184,  -117.7553,     ,      OR,    1,   BARRANCA2,    565,,,
+1201052,  133,  S,     12,      59,    36770,  9,        8.991, 33.66184,  -117.7553,     ,      FR,    1,   BARRANCA 2,   565,,,
+1201054,  133,  S,     12,      59,    36770,  9,        8.991, 33.66184,  -117.7553,   2.685,   ML,    3,   BARRANCA2,    565,,,
+1201058,  133,  N,     12,      59,    36770,  8.866,    8.857, 33.659542, -117.756294,   ,      OR,    1,   BARRANCA1,    551,,,
+...</code></pre>
+</section>
+<section id="solution" class="slide level1">
+<h1>Solution</h1>
+<ul>
+<li>Put the VDS data into PostgreSQL</li>
+<li>Use PostGIS to make Point geometries</li>
+<li>Show the points as a layer on a web map</li>
+<li>Wire up “click” to call up modeling results</li>
+</ul>
+</section>
+<section id="solution-1" class="slide level1">
+<h1>Solution</h1>
+<ul>
+<li>Put the VDS data into PostgreSQL</li>
+<li>Use PostGIS to make Point geometries</li>
+<li><del>Show the points as a layer on a web map</del></li>
+<li><del>Wire up “click” to call up modeling results</del></li>
+</ul>
+</section>
+<section id="vds-loop-detector-tables" class="slide level1">
+<h1>VDS loop detector tables</h1>
+<ol type="1">
+<li>Loop detector metadata</li>
+<li>Loop detector geometry in SRID 4269 (original)</li>
+<li>Loop detector geometry in SRID 4326 (for Google Maps)</li>
+<li>Join tables</li>
+</ol>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/vds_geom_diagram.png" alt="Normalized Tables" /><figcaption>“Normalized” Tables</figcaption>
+</figure>
+</section>
+<section id="load-up-using-perl" class="slide level1">
+<h1>Load up using perl</h1>
+<ul>
+<li>Parse the CSV metadata file</li>
+<li>For each detector
+<ul>
+<li>find or create entry in <code>vds_id_all</code></li>
+<li>find or create entry in <code>geom_points_4269</code></li>
+<li>use PostGIS to transform geometry for <code>geom_points_4326</code></li>
+<li>make the join table entries</li>
+</ul></li>
+</ul>
+</section>
+<section id="loading-code" class="slide level1">
+<h1>Loading code</h1>
+<div class="sourceCode"><pre class="sourceCode perl"><code class="sourceCode perl"><span class="kw">my</span> <span class="dt">$vds</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_vds_or_die</span>(<span class="dt">$pk</span>,<span class="dt">$data</span>);
+<span class="kw">my</span> <span class="dt">$lon</span> = <span class="dt">$vds</span>-&gt;<span class="dt">longitude</span>;
+<span class="kw">my</span> <span class="dt">$lat</span> = <span class="dt">$vds</span>-&gt;<span class="dt">latitude</span>;
+<span class="kw">my</span> <span class="dt">$new_geoid</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_new_geoid</span>;
+<span class="kw">my</span> <span class="dt">$gid</span>        = <span class="dt">$new_geoid</span>-&gt;<span class="dt">gid</span>;
+<span class="kw">my</span> <span class="dt">$creategeom</span> = <span class="dt">$self</span>-&gt;<span class="dt">create_geompoint_4269</span>(<span class="dt">$lon</span>,<span class="dt">$lat</span>,<span class="dt">$gid</span>);
+<span class="dt">$self</span>-&gt;<span class="dt">join_geom</span>(<span class="dt">$vds</span>,<span class="dt">$gid</span>,<span class="dv">4269</span>);
+<span class="dt">$new_geoid</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_new_geoid</span>();
+<span class="kw">my</span> <span class="dt">$projectedgid</span>        = <span class="dt">$new_geoid</span>-&gt;<span class="dt">gid</span>;
+<span class="kw">my</span> <span class="dt">$projectedpoint</span> = <span class="dt">$self</span>-&gt;<span class="dt">project_geom_4326</span>(<span class="dt">$gid</span>,<span class="dt">$projectedgid</span>);
+<span class="dt">$self</span>-&gt;<span class="dt">join_geom</span>(<span class="dt">$vds</span>,<span class="dt">$projectedgid</span>,<span class="dv">4326</span>);</code></pre></div>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/vds_geom_diagram_1.png" />
+</figure>
+<div class="sourceCode"><pre class="sourceCode perl"><code class="sourceCode perl"><span class="kw">my</span> <span class="dt">$vds</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_vds_or_die</span>(<span class="dt">$pk</span>,<span class="dt">$data</span>);</code></pre></div>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/vds_geom_diagram_2.png" />
+</figure>
+<div class="sourceCode"><pre class="sourceCode perl"><code class="sourceCode perl"><span class="kw">my</span> <span class="dt">$new_geoid</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_new_geoid</span>;
+<span class="kw">my</span> <span class="dt">$gid</span>        = <span class="dt">$new_geoid</span>-&gt;<span class="dt">gid</span>;
+<span class="kw">my</span> <span class="dt">$creategeom</span> = <span class="dt">$self</span>-&gt;<span class="dt">create_geompoint_4269</span>(<span class="dt">$lon</span>,<span class="dt">$lat</span>,<span class="dt">$gid</span>);</code></pre></div>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/vds_geom_diagram_3.png" />
+</figure>
+<div class="sourceCode"><pre class="sourceCode perl"><code class="sourceCode perl"><span class="dt">$self</span>-&gt;<span class="dt">join_geom</span>(<span class="dt">$vds</span>,<span class="dt">$gid</span>,<span class="dv">4269</span>);</code></pre></div>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/vds_geom_diagram_4a.png" />
+</figure>
+<div class="sourceCode"><pre class="sourceCode perl"><code class="sourceCode perl"><span class="dt">$new_geoid</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_new_geoid</span>();
+<span class="kw">my</span> <span class="dt">$projectedgid</span>        = <span class="dt">$new_geoid</span>-&gt;<span class="dt">gid</span>;
+<span class="kw">my</span> <span class="dt">$projectedpoint</span> = <span class="dt">$self</span>-&gt;<span class="dt">project_geom_4326</span>(<span class="dt">$gid</span>,<span class="dt">$projectedgid</span>);</code></pre></div>
+</section>
+<section class="slide level1">
+
+<div class="sourceCode"><pre class="sourceCode perl tall"><code class="sourceCode perl">method project_geom_4326(Int <span class="dt">$gid4269</span>,Int <span class="dt">$gid4326</span>){
+    <span class="kw">my</span> <span class="dt">$transform</span>;
+    <span class="kw">my</span> <span class="dt">$test_eval</span> = <span class="fu">eval</span> {
+        <span class="kw">my</span> <span class="dt">$arr</span> = [<span class="kw">q{</span><span class="st">ST_AsText(ST_Transform(me.geom,4326))</span><span class="kw">}</span>];
+        (<span class="dt">$transform</span>) = <span class="dt">$self</span>-&gt;<span class="dt">resultset</span>(<span class="kw">&#39;</span><span class="st">Public::GeomPoints4269</span><span class="kw">&#39;</span>)-&gt;search(
+            { <span class="kw">&#39;</span><span class="st">gid</span><span class="kw">&#39;</span> =&gt; <span class="dt">$gid4269</span> },
+            {
+                <span class="fu">select</span> =&gt; [ <span class="kw">&#39;</span><span class="st">gid</span><span class="kw">&#39;</span>, \<span class="dt">$arr</span> ],
+                as =&gt; [<span class="kw">qw/</span>gid  wkt_transform <span class="kw">/</span>],
+            },
+            );
+    };
+    <span class="kw">if</span> (<span class="dt">$EVAL_ERROR</span>) {    <span class="co"># find or create failed</span>
+        carp <span class="kw">&quot;</span><span class="st">can&#39;t fetch transform </span><span class="dt">$EVAL_ERROR</span><span class="kw">&quot;</span>;
+        croak;
+    }
+    <span class="kw">my</span> <span class="dt">$projectedpoint</span>;
+    <span class="dt">$test_eval</span> = <span class="fu">eval</span> {
+        <span class="kw">my</span> <span class="dt">$arr</span> = [
+            <span class="kw">q{</span><span class="st">ST_GeometryFromText(?,4326)</span><span class="kw">}</span>,
+            [<span class="kw">&#39;</span><span class="st">dummy</span><span class="kw">&#39;</span>=&gt;<span class="dt">$transform</span>-&gt;<span class="dt">get_column</span>(<span class="kw">&#39;</span><span class="st">wkt_transform</span><span class="kw">&#39;</span>)]
+            ];
+        <span class="dt">$projectedpoint</span> = <span class="dt">$self</span>-&gt;<span class="dt">resultset</span>(<span class="kw">&#39;</span><span class="st">Public::GeomPoints4326</span><span class="kw">&#39;</span>)-&gt;create(
+            {
+                gid  =&gt; <span class="dt">$gid4326</span>,
+                geom =&gt; \<span class="dt">$arr</span>,
+            }
+            );
+    };
+    <span class="kw">if</span> (<span class="dt">$EVAL_ERROR</span>) {    <span class="co"># find or create failed</span>
+        carp <span class="kw">&quot;</span><span class="st">can&#39;t create new tranformed geometry </span><span class="dt">$EVAL_ERROR</span><span class="kw">&quot;</span>;
+        croak;
+    }
+    <span class="kw">return</span> <span class="dt">$projectedpoint</span>;
+}</code></pre></div>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/vds_geom_diagram_4.png" />
+</figure>
+<div class="sourceCode"><pre class="sourceCode perl"><code class="sourceCode perl"><span class="dt">$new_geoid</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_new_geoid</span>();
+<span class="kw">my</span> <span class="dt">$projectedgid</span>        = <span class="dt">$new_geoid</span>-&gt;<span class="dt">gid</span>;
+<span class="kw">my</span> <span class="dt">$projectedpoint</span> = <span class="dt">$self</span>-&gt;<span class="dt">project_geom_4326</span>(<span class="dt">$gid</span>,<span class="dt">$projectedgid</span>);</code></pre></div>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/vds_geom_diagram_5.png" />
+</figure>
+<div class="sourceCode"><pre class="sourceCode perl"><code class="sourceCode perl"><span class="dt">$self</span>-&gt;<span class="dt">join_geom</span>(<span class="dt">$vds</span>,<span class="dt">$projectedgid</span>,<span class="dv">4326</span>);</code></pre></div>
+</section>
+<section id="calvad-project" class="slide level1">
+<h1>2010 CalVAD project</h1>
+</section>
+<section id="add-weigh-in-motion-stations" class="slide level1">
+<h1>Add Weigh-In-Motion stations</h1>
+<ul>
+<li>About 150 WIM stations</li>
+<li>Similar approach as with VDS sites</li>
+<li>Metadata table, join table, geometry table</li>
+</ul>
+</section>
+<section id="but-i-had-an-idea" class="slide level1">
+<h1>But I had an idea!</h1>
+<ul>
+<li>Why not just reuse the geom_point_xxxx tables?</li>
+</ul>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/add_wim_stations_colored.png" alt="WIM points and VDS points pull from the same points tables" /><figcaption>WIM points and VDS points pull from the same points tables</figcaption>
+</figure>
+</section>
+<section id="similar-createpopulate-perl" class="slide level1">
+<h1>Similar create/populate perl</h1>
+<ul>
+<li>Parse the CSV metadata file</li>
+<li>For each detector
+<ul>
+<li>find or create entry in <code>wim_stations</code></li>
+<li>find or create entry in <code>geom_points_4269</code></li>
+<li>use PostGIS to transform geometry for <code>geom_points_4326</code></li>
+<li>make the join table entries</li>
+</ul></li>
+</ul>
+</section>
+<section id="years-go-by" class="slide level1">
+<h1>Years go by</h1>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/2010_10_15.jpg" />
+</figure>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/2015_11_11.jpg" />
+</figure>
+</section>
+<section id="fall-2015-transfer-db" class="slide level1">
+<h1>Fall 2015, transfer DB</h1>
+<ul>
+<li>Some database tables are way too big to copy</li>
+<li>Many are manageable, but</li>
+<li>Learning by doing</li>
+<li>Teach my ARB counterpart what to do:
+<ul>
+<li>Load the required software</li>
+<li>Download the data</li>
+<li>Run the code</li>
+</ul></li>
+</ul>
+</section>
+<section id="no-metadata-overlap" class="slide level1">
+<h1>No metadata overlap…</h1>
+<ul>
+<li>My DB had processed through 2012</li>
+<li>ARB downloaded 2013, 2014, 2015 data</li>
+<li>I cleaned up <a href="https://github.com/jmarca/CalVAD-PEMS-StationsParse">my perl code</a> (now using Dist::Zilla)</li>
+<li>I added tests to perl code</li>
+<li>On ARB server, we
+<ul>
+<li>Installed perl, etc</li>
+<li>Installed PostgreSQL, PostGIS</li>
+<li>Parsed and loaded 2013, 2014, 2015 VDS metadata</li>
+</ul></li>
+</ul>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/add_wim_stations.png" alt="Recall the DB tables…" /><figcaption>Recall the DB tables…</figcaption>
+</figure>
+</section>
+<section id="weeks-pass" class="slide level1">
+<h1>Weeks pass</h1>
+<ul>
+<li>Regular phone calls working through CalVAD code</li>
+<li>Setting up software</li>
+<li>Populating DB tables</li>
+<li>Processing data</li>
+</ul>
+</section>
+<section id="time-to-use-the-wim-detector-metadata" class="slide level1">
+<h1>Time to use the WIM detector metadata</h1>
+<ul>
+<li>For WIM sites, about the same data now as in 2010</li>
+<li>Slower pace of change</li>
+<li>I decided <em>not</em> to upgrade/modernize my WIM perl code</li>
+<li>I decided <em>instead</em> to just copy the WIM metadata to ARB</li>
+</ul>
+</section>
+<section id="oops" class="slide level1">
+<h1>Oops!</h1>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/add_wim_stations_c2.png" alt="The WIM join tables got overwritten" /><figcaption>The WIM join tables got overwritten</figcaption>
+</figure>
+</section>
+<section id="i-broke-the-join-table" class="slide level1">
+<h1>I broke the join table</h1>
+<ul>
+<li>We created new VDS points in the new DB</li>
+<li>The actual GID values are completely different</li>
+<li>But I copied the wim_points_xxx tables from my DB</li>
+<li><em>with the wrong GID values</em></li>
+</ul>
+</section>
+<section id="fix-this" class="slide level1">
+<h1>Fix this</h1>
+<ul>
+<li>Sqitch to organize the fix</li>
+<li>pgTAP
+<ul>
+<li>to prove there is a problem</li>
+<li>to prove the fix worked</li>
+</ul></li>
+</ul>
+</section>
+<section id="pgtap" class="slide level1">
+<h1>pgTAP</h1>
+<ul>
+<li>TAP = test anything protocol</li>
+<li>Lets you run tests in the database</li>
+<li>github: <a href="https://github.com/theory/pgtap" class="uri">https://github.com/theory/pgtap</a></li>
+<li>docs: <a href="http://pgtap.org" class="uri">http://pgtap.org</a></li>
+</ul>
+</section>
+<section id="pgtap-hello-world" class="slide level1">
+<h1>pgTAP “Hello World”</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SET</span> client_min_messages <span class="kw">TO</span> warning;
+<span class="kw">CREATE</span> EXTENSION IF <span class="kw">NOT</span> <span class="kw">EXISTS</span> pgtap;
+<span class="kw">RESET</span> client_min_messages;
+
+<span class="kw">BEGIN</span>;
+<span class="kw">SELECT</span> no_plan();
+<span class="co">-- SELECT plan(1);</span>
+
+<span class="kw">SELECT</span> pass(<span class="st">&#39;Hello Brooklyn!&#39;</span>);
+
+<span class="kw">SELECT</span> finish();
+<span class="kw">ROLLBACK</span>;</code></pre></div>
+</section>
+<section id="testing" class="slide level1">
+<h1>Testing</h1>
+<blockquote>
+<p>The basic purpose of pgTAP … is to print out either “ok #” or “not ok #”, depending on whether a given test succeeded or failed.</p>
+</blockquote>
+<p>—from the README</p>
+</section>
+<section id="pgtap-basic-usage" class="slide level1">
+<h1>pgTAP basic usage</h1>
+<ul>
+<li>As a simple test script</li>
+<li>In xUnit-style test functions that you install into your database and run all at once</li>
+</ul>
+</section>
+<section id="pgtap-advanced-features" class="slide level1">
+<h1>pgTAP advanced features</h1>
+<ul>
+<li>Can integrate with any TAP testing system</li>
+<li>TAP consumers exist in most languages</li>
+<li>xUnit-style usage</li>
+<li>compatible with continuous integration servers
+<ul>
+<li>Hudson, Travis etc</li>
+</ul></li>
+</ul>
+</section>
+<section id="i-dont-really-know-what-that-previous-slide-means" class="slide level1">
+<h1>I don’t really know what that previous slide means</h1>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/shinola_container.png" alt="This is a can of Shinola, a shoe polish brand that went out of business" /><figcaption>This is a can of Shinola, a shoe polish brand that went out of business</figcaption>
+</figure>
+</section>
+<section id="my-testing-needs" class="slide level1">
+<h1>My testing needs</h1>
+<ol type="1">
+<li>Make sure the database tables exist</li>
+<li>Verify primary keys</li>
+<li>Make sure the tables reference each other</li>
+<li>Make sure each WIM station has a geometry</li>
+<li>Verify metadata (lat,lon) matches the linked geometry</li>
+</ol>
+</section>
+<section id="testing-approach" class="slide level1">
+<h1>Testing approach</h1>
+<ul>
+<li>Simple test script</li>
+<li>Run the script using pg_prove</li>
+</ul>
+</section>
+<section id="pg_prove" class="slide level1">
+<h1>pg_prove</h1>
+<ul>
+<li>http://search.cpan.org/dist/TAP-Parser-SourceHandler-pgTAP</li>
+</ul>
+<pre><code>cpanm --sudo TAP::Parser::SourceHandler::pgTAP</code></pre>
+</section>
+<section id="cpanm" class="slide level1">
+<h1>cpanm?</h1>
+<pre><code>cpan install App::cpanminus</code></pre>
+<p>… then later …</p>
+<pre><code>cpanm -S --self-upgrade</code></pre>
+</section>
+<section id="testing-tables-schemas" class="slide level1">
+<h1>Testing tables, schemas</h1>
+<ul>
+<li>has_schema()</li>
+<li>has_table()</li>
+<li>schemas_are()</li>
+<li>tables_are()</li>
+</ul>
+</section>
+<section id="the-has_-test-variants" class="slide level1">
+<h1>The ‘has_’ test variants</h1>
+<ul>
+<li>Checks that something exists</li>
+<li>The test fails if that thing is not in the database</li>
+<li>For example</li>
+</ul>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SELECT</span> has_table(<span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_stations&#39;</span>,<span class="st">&#39;there is a wim_stations table&#39;</span>);</code></pre></div>
+</section>
+<section id="the-_are-test-variants" class="slide level1">
+<h1>The ‘_are’ test variants</h1>
+<ul>
+<li>Checks that the DB contains exactly the list you specify</li>
+<li>Will fail if something is missing</li>
+<li>Will fail if something extra exists</li>
+<li>For example</li>
+</ul>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SELECT</span> schemas_are(ARRAY[ <span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim&#39;</span>,<span class="st">&#39;osm&#39;</span>,<span class="st">&#39;vds&#39;</span>,<span class="st">&#39;sqitch&#39;</span>,<span class="st">&#39;pgRouting&#39;</span> ],
+                   <span class="st">&#39;expected schemas exist in database&#39;</span>);</code></pre></div>
+</section>
+<section id="basic-tests" class="slide level1">
+<h1>Basic tests</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="co">-- is there a wim_stations table?</span>
+<span class="kw">SELECT</span> has_table(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_stations&#39;</span>, <span class="st">&#39;there is a wim_stations table&#39;</span>);
+
+<span class="co">-- are  there join tables?</span>
+<span class="kw">SELECT</span> has_table(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4269&#39;</span>, <span class="st">&#39;there is a wim_points_4269 table&#39;</span>);
+<span class="kw">SELECT</span> has_table(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4326&#39;</span>, <span class="st">&#39;there is a wim_points_4326 table&#39;</span>);
+
+<span class="co">-- are there geometry tables?</span>
+<span class="kw">SELECT</span> has_table(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4269&#39;</span>,<span class="st">&#39;there is a geom_points_4269 table&#39;</span>);
+<span class="kw">SELECT</span> has_table(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4326&#39;</span>,<span class="st">&#39;there is a geom_points_4326 table&#39;</span>);</code></pre></div>
+</section>
+<section id="quick-demo" class="slide level1">
+<h1>quick demo</h1>
+</section>
+<section id="testing-table-characteristics" class="slide level1">
+<h1>Testing table characteristics</h1>
+<ul>
+<li>col_is_pk()</li>
+<li>has_pk()</li>
+<li>col_is_fk()</li>
+<li>has_fk()</li>
+</ul>
+</section>
+<section id="primary-keys" class="slide level1">
+<h1>Primary keys?</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_stations&#39;</span>, <span class="st">&#39;site_no&#39;</span>, <span class="st">&#39;wim stations site_no is pk&#39;</span> );
+<span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4269&#39;</span>,<span class="st">&#39;gid&#39;</span>, <span class="st">&#39;geom points 4269 gid is pk&#39;</span> );
+<span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4326&#39;</span>,<span class="st">&#39;gid&#39;</span>, <span class="st">&#39;geom points 4326 gid is pk&#39;</span> );
+
+<span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4326&#39;</span>,ARRAY[<span class="st">&#39;gid&#39;</span>,<span class="st">&#39;wim_id&#39;</span>], <span class="st">&#39;geom points 4326 gid is pk&#39;</span> );
+<span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4269&#39;</span>,ARRAY[<span class="st">&#39;gid&#39;</span>,<span class="st">&#39;wim_id&#39;</span>], <span class="st">&#39;geom points 4269 gid is pk&#39;</span> );</code></pre></div>
+</section>
+<section id="quick-demo-1" class="slide level1">
+<h1>quick demo</h1>
+</section>
+<section id="testing-foreign-keys" class="slide level1">
+<h1>Testing foreign keys</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SELECT</span> fk_ok( <span class="ch">:</span>fk_schema, <span class="ch">:</span>fk_table,   <span class="ch">:</span>fk_columns,
+              <span class="ch">:</span>pk_schema,  <span class="ch">:</span>pk_table, <span class="ch">:</span>pk_columns,
+              <span class="ch">:</span>description );
+</code></pre></div>
+</section>
+<section class="slide level1">
+
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql tall"><code class="sourceCode sqlpostgresql"><span class="co">-- 4269</span>
+<span class="kw">SELECT</span> fk_ok(
+    <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_stations&#39;</span>,<span class="st">&#39;site_no&#39;</span>,
+    <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_points_4269&#39;</span>,<span class="st">&#39;wim_id&#39;</span>,
+    <span class="st">&#39;wim_points_4269 connects to wim_stations&#39;</span>
+);
+<span class="kw">SELECT</span> fk_ok(
+    <span class="st">&#39;public&#39;</span>,<span class="st">&#39;geom_points_4269&#39;</span>,<span class="st">&#39;gid&#39;</span>,
+    <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_points_4269&#39;</span>,<span class="st">&#39;gid&#39;</span>,
+    <span class="st">&#39;wim_points_4269 connects to geom_points_4269&#39;</span>
+);
+
+
+<span class="co">--4326</span>
+<span class="kw">SELECT</span> fk_ok(
+    <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_stations&#39;</span>,<span class="st">&#39;site_no&#39;</span>,
+    <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_points_4326&#39;</span>,<span class="st">&#39;wim_id&#39;</span>,
+    <span class="st">&#39;wim_points_4326 connects to wim_stations&#39;</span>
+);
+<span class="kw">SELECT</span> fk_ok(
+    <span class="st">&#39;public&#39;</span>,<span class="st">&#39;geom_points_4326&#39;</span>,<span class="st">&#39;gid&#39;</span>,
+    <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_points_4326&#39;</span>,<span class="st">&#39;gid&#39;</span>,
+    <span class="st">&#39;wim_points_4326 connects to geom_points_4326&#39;</span>
+);</code></pre></div>
+</section>
+<section id="quick-demo-2" class="slide level1">
+<h1>quick demo</h1>
+</section>
+<section id="testing-indices" class="slide level1">
+<h1>Testing indices</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="co">-- are indexes set up?</span>
+<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_stations&#39;</span>, <span class="st">&#39;site_no&#39;</span>,ARRAY[<span class="ch">:</span>indexes], <span class="st">&#39;wim_stations has index&#39;</span> );
+<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4269&#39;</span>,<span class="st">&#39;gid&#39;</span>,  ARRAY[<span class="ch">:</span>indexes],<span class="st">&#39;geom_points_4269 has index&#39;</span> );
+<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4326&#39;</span>,<span class="st">&#39;gid&#39;</span>,  ARRAY[<span class="ch">:</span>indexes],<span class="st">&#39;geom_points_4326 has index&#39;</span> );
+<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4269&#39;</span> ,<span class="st">&#39;gid&#39;</span>,  ARRAY[<span class="ch">:</span>indexes],<span class="st">&#39;wim_points_4269 has index&#39;</span> );
+<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4326&#39;</span> ,<span class="st">&#39;gid&#39;</span>,  ARRAY[<span class="ch">:</span>indexes],<span class="st">&#39;wim_points_4326 has index&#39;</span> );</code></pre></div>
+</section>
+<section id="quick-demo-3" class="slide level1">
+<h1>quick demo</h1>
+</section>
+<section id="not-limited-to-simple-tests" class="slide level1">
+<h1>Not limited to simple tests</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SELECT</span> results_eq(   A,      B,    <span class="ch">:</span>description );
+
+<span class="kw">SELECT</span> results_eq( <span class="ch">:</span>sql,    <span class="ch">:</span>sql,    <span class="ch">:</span>description );
+<span class="kw">SELECT</span> results_eq( <span class="ch">:</span>sql,    <span class="ch">:</span>array,  <span class="ch">:</span>description );
+<span class="kw">SELECT</span> results_eq( <span class="ch">:</span>cursor, <span class="ch">:</span>cursor, <span class="ch">:</span>description );
+<span class="kw">SELECT</span> results_eq( <span class="ch">:</span>sql,    <span class="ch">:</span>cursor, <span class="ch">:</span>description );
+<span class="kw">SELECT</span> results_eq( <span class="ch">:</span>cursor, <span class="ch">:</span>sql,    <span class="ch">:</span>description );
+<span class="kw">SELECT</span> results_eq( <span class="ch">:</span>cursor, <span class="ch">:</span>array,  <span class="ch">:</span>description );</code></pre></div>
+<p>results_eq() is a workhorse for my kind of problems.</p>
+</section>
+<section id="caveat" class="slide level1">
+<h1>Caveat</h1>
+<ul>
+<li>Need to quote <code>:sql</code> arguments
+<ul>
+<li>so use <code>prepare</code> statements</li>
+</ul></li>
+<li>results_eq() does item by item comparison of A vs B
+<ul>
+<li>Be careful to order results explicitly</li>
+</ul></li>
+</ul>
+</section>
+<section id="have-enough-entries" class="slide level1">
+<h1>Have enough entries?</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="co">-- make sure join relations are all there</span>
+<span class="kw">select</span> results_eq(
+    <span class="st">&#39;select site_no from wim_stations order by site_no&#39;</span>,
+    <span class="st">&#39;select wim_site from wim_points_4269 order by wim_site&#39;</span>
+);
+
+<span class="kw">select</span> results_eq(
+    <span class="st">&#39;select site_no from wim_stations order by site_no&#39;</span>,
+    <span class="st">&#39;select wim_site from wim_points_4326 order by wim_site&#39;</span>
+);</code></pre></div>
+</section>
+<section id="quick-demo-4" class="slide level1">
+<h1>quick demo</h1>
+</section>
+<section id="geometries-vs-metadata" class="slide level1">
+<h1>Geometries vs metadata</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql tall"><code class="sourceCode sqlpostgresql"><span class="co">-- do the geometries actually match the metadata in all cases?</span>
+<span class="kw">PREPARE</span> build_geoms_4269 <span class="kw">AS</span>
+  <span class="kw">SELECT</span> ST_GeomFromEWKT(<span class="st">&#39;SRID=4269;POINT(&#39;</span>||a.longitude||<span class="st">&#39; &#39;</span>||a.latitude||<span class="st">&#39;)&#39;</span>)
+  <span class="kw">FROM</span> wim_stations a
+  <span class="kw">ORDER</span> <span class="kw">BY</span> site_no;
+
+<span class="kw">PREPARE</span> existing_geoms_4269 <span class="kw">AS</span>
+  <span class="kw">SELECT</span> b.geom
+  <span class="kw">FROM</span> wim_points_4269 a
+  <span class="kw">JOIN</span> geom_points_4269 b <span class="kw">USING</span> (gid)
+  <span class="kw">ORDER</span> <span class="kw">BY</span> wim_id;
+
+<span class="co">-- expect that the metadata matches the stored 4269 geoms</span>
+<span class="kw">SELECT</span> results_eq(
+    <span class="st">&#39;build_geoms_4269&#39;</span>,
+    <span class="st">&#39;existing_geoms_4269&#39;</span>
+);</code></pre></div>
+</section>
+<section id="geometries-vs-metadata-1" class="slide level1">
+<h1>Geometries vs metadata</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql tall"><code class="sourceCode sqlpostgresql"><span class="co">-- now test projection</span>
+<span class="kw">PREPARE</span> projected_geoms_4269_to_4326 <span class="kw">AS</span>
+  <span class="kw">SELECT</span> ST_TRANSFORM(b.geom,<span class="dv">4326</span>)
+  <span class="kw">FROM</span> wim_points_4269 a
+  <span class="kw">JOIN</span> geom_points_4269 b <span class="kw">USING</span> (gid)
+  <span class="kw">ORDER</span> <span class="kw">BY</span> wim_id;
+
+<span class="kw">PREPARE</span> existing_geoms_4326 <span class="kw">AS</span>
+  <span class="kw">SELECT</span> b.geom
+  <span class="kw">FROM</span> wim_points_4326 a
+  <span class="kw">JOIN</span> geom_points_4326 b <span class="kw">USING</span> (gid)
+  <span class="kw">ORDER</span> <span class="kw">BY</span> wim_id;
+
+
+<span class="co">--expect that the transformed 4269 geoms matches the stored 4326 geoms</span>
+<span class="kw">SELECT</span> results_eq(
+    <span class="st">&#39;projected_geoms_4269_to_4326&#39;</span>,
+    <span class="st">&#39;existing_geoms_4326&#39;</span>
+);</code></pre></div>
+</section>
+<section id="quick-demo-5" class="slide level1">
+<h1>quick demo</h1>
+</section>
+<section id="part-2-a-bad-design-decision" class="slide level1">
+<h1>Part 2: A bad design decision</h1>
+</section>
+<section id="vds-data-changes" class="slide level1">
+<h1>VDS data changes</h1>
+<ul>
+<li>Regular releases of new metadata files</li>
+<li>Need to download and parse the metadata files for
+<ul>
+<li>new loop detectors coming on line</li>
+<li>missing loop detectors that were retired</li>
+</ul></li>
+</ul>
+</section>
+<section id="metadata" class="slide level1">
+<h1>Metadata</h1>
+<table style="width:86%;">
+<colgroup>
+<col style="width: 43%" />
+<col style="width: 43%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Things that don’t change</th>
+<th>Things that change</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><p>ID</p></td>
+<td><p>State PM</p></td>
+</tr>
+<tr class="even">
+<td><p>Fwy</p></td>
+<td><p>Absolute PM</p></td>
+</tr>
+<tr class="odd">
+<td><p>Direction</p></td>
+<td><p>Length</p></td>
+</tr>
+<tr class="even">
+<td><p>District</p></td>
+<td><p>User ID fields</p></td>
+</tr>
+<tr class="odd">
+<td><p>County</p></td>
+<td></td>
+</tr>
+<tr class="even">
+<td><p>City</p></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><p>Latitude</p></td>
+<td></td>
+</tr>
+<tr class="even">
+<td><p>Longitude</p></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><p>Type</p></td>
+<td></td>
+</tr>
+<tr class="even">
+<td><p>Name</p></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="part-3-modularize-and-test-detector-geolocationsegmentation-code" class="slide level1">
+<h1>Part 3: modularize and test detector geolocation/segmentation code</h1>
+<p>Show the big code and how I use Sqitch inter-package dependencies</p>
+</section>
+<section id="part-4-migrate-to-caltrans-state-highway-network" class="slide level1">
+<h1>part 4: migrate to caltrans state highway network</h1>
+<p>Not sure what the point of this one is in terms of sqitch and pgtap usage</p>
+</section>
+    </div>
+  </div>
+
+
+  <script src="reveal.js/lib/js/head.min.js"></script>
+  <script src="reveal.js/js/reveal.js"></script>
+
+  <script>
+
+      // Full list of configuration options available here:
+      // https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+        theme: 'sky', // available themes are in /css/theme
+        transition: 'fade','width':'1269', // default/cube/page/concave/zoom/linear/fade/none
+
+        // Optional libraries used to extend on reveal.js
+        dependencies: [
+          { src: 'reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+          { src: 'reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } },
+//          { src: 'reveal.js/plugin/search/search.js', async: true, condition: function() { return !!document.body.classList; }, }
+//          { src: 'reveal.js/plugin/remotes/remotes.js', async: true, condition: function() { return !!document.body.classList; } }
+]});
+    </script>
+    </body>
+</html>
