@@ -614,7 +614,8 @@ SELECT has_table('public', 'geom_points_4269','there is a geom_points_4269 table
 SELECT has_table('public', 'geom_points_4326','there is a geom_points_4326 table');
 ```
 
-# quick demo
+# live demo
+
 
 # Testing table characteristics
 
@@ -638,8 +639,25 @@ SELECT col_is_pk('public', 'wim_points_4269','wim_id', 'geom points 4269 gid is 
 
 # quick demo
 
+# Indexes or Indices?
+
+* use `indexes_are(:schema,:table,ARRAY[:indexes],:description)
+* Don't forget the list of indices is an ARRAY
+
+```sqlpostgresql
+SELECT indexes_are('public', 'wim_stations',
+                   ARRAY['wim_stations_pkey'],'wim_stations has index' );
+SELECT indexes_are('public', 'geom_points_4269',
+                   ARRAY['geom_points_4269_pkey','geom_points_4269_geom_index'],
+                   'geom_points_4269 has index' );
+```
+
 
 # Testing foreign keys
+
+* `fk_ok` is a very cool function
+* checks table to table relationships in one go
+
 
 ``` sqlpostgresql
 SELECT fk_ok( :fk_schema, :fk_table,   :fk_columns,
@@ -678,7 +696,7 @@ SELECT fk_ok(
 );
 ```
 
-# quick demo
+#  demo
 
 
 # Not limited to simple tests
@@ -696,7 +714,7 @@ SELECT results_eq( :cursor, :array,  :description );
 
 results_eq() is a workhorse for my kind of problems.
 
-# Caveat
+# results_eq() Caveats
 
 * Need to quote `:sql` arguments
     * so use `prepare` statements
@@ -711,14 +729,13 @@ results_eq() is a workhorse for my kind of problems.
 -- make sure join relations are all there
 select results_eq(
     'select site_no from wim_stations order by site_no',
-    'select wim_site from wim_points_4269 order by wim_site'
+    'select wim_id from wim_points_4269 order by wim_id'
 );
 
 select results_eq(
     'select site_no from wim_stations order by site_no',
-    'select wim_site from wim_points_4326 order by wim_site'
+    'select wim_id from wim_points_4326 order by wim_id'
 );
-
 ```
 
 # quick demo
@@ -777,12 +794,11 @@ SELECT results_eq(
 
 # use Sqitch
 
-From the same team of one that brought use pgTAP comes Sqitch
-
 (No 'u')
 
 # What is Sqitch?
 
+* Also by David Wheeler
 * Docs: <http://sqitch.org/>
 * Code: <https://github.com/theory/sqitch>
 * A database change management application.
@@ -804,10 +820,134 @@ Really.  Its superb.
 
 ```bash
 sqitch init calvad_wim_geometries --uri https://github.com/jmarca/calvad_wim_geometries --engine pg
-sqitch target add brokendb db:pg:slash@127.0.0.1/brokendb
+createdb -U slash -h 127.0.0.1 brokendb
+sqitch target add brokendb db:pg://slash@127.0.0.1/brokendb
 sqitch engine add pg brokendb
 sqitch add brooklyn  -m 'Hello Brooklyn!'
-sqitch deploy brooklyn
+sqitch deploy
+```
+
+# Using sqitch to fix things
+
+0. Make, populate a test "broken" database
+1. Deploy the sqitch scaffolding
+2. Edit the deploy, verify, rollback, test files
+3. See if it works
+4. Repeat steps 2 and 3
+
+
+# Broken db
+
+generated with mocha test script
+
+# Add a sqitch change
+
+```
+sqitch add fix_4269_geoms -m 'Fix metadata vs geom mismatch'
+
+```
+
+Then edit `deploy/fix_4269_geoms.sql`
+
+
+-------
+
+```{.sqlpostgresql .tall}
+BEGIN;
+-- first, clear the decks
+drop table  wim_points_4269;
+
+-- recreate without any FK to geom_points
+CREATE TABLE wim_points_4269 (
+    gid integer NOT NULL,
+    wim_id integer NOT NULL  primary key REFERENCES wim_stations (site_no)   ON DELETE CASCADE
+);
+
+-- get rid of gid relationship in geom_points
+ALTER TABLE ONLY geom_points_4269
+    DROP CONSTRAINT geom_points_4269_gid_fkey;
+CREATE SEQUENCE geom_points_4269_gid_seq;
+ALTER TABLE geom_points_4269
+    ALTER COLUMN gid SET DEFAULT
+    nextval('geom_points_4269_gid_seq');
+ALTER SEQUENCE geom_points_4269_gid_seq OWNED BY geom_points_4269.gid;
+SELECT setval('geom_points_4269_gid_seq',nextval('geom_ids_gid_seq'));
+
+-- try to fix the broken geometries
+
+-- create geoms holds geometries created from the metadata
+WITH create_geoms AS (
+  SELECT site_no, ST_GeomFromEWKT('SRID=4269;POINT('||a.longitude||' '||a.latitude||')') as geom
+  FROM wim_stations a
+  ORDER BY site_no
+),
+
+-- some of the geoms are likely repeated.  only make one
+distinct_geoms AS (
+  select distinct geom from create_geoms
+),
+
+-- Only keep those points that are not already in the
+-- geom_points_4269 table
+not_in_geoms_table AS (
+  select a.geom
+  from distinct_geoms a
+  left outer join geom_points_4269 b on (a.geom=b.geom)
+  where b.geom is null
+),
+
+-- insert the new geometries
+inserted_geoms AS (
+  INSERT INTO geom_points_4269 (geom)
+  SELECT geom
+  FROM not_in_geoms_table
+    RETURNING geom,gid
+),
+
+-- combine both new and old for pairing off in join table
+new_and_old as (
+  select a.geom,a.gid
+  from geom_points_4269 a
+  join distinct_geoms b on (a.geom=b.geom)
+  union
+  select aa.geom,aa.gid
+  from inserted_geoms aa
+  join distinct_geoms b on (aa.geom=b.geom)
+),
+
+-- there is no guarantee that geometries in
+-- geom_points_4269 are unique
+-- so reduce new_and_old using DISTINCT
+unique_set as (
+  select distinct min(gid) as gid,geom
+  from new_and_old
+  group by geom
+),
+
+-- finally, join wim site numbers with the newly created gid values by
+-- joining the tables on geom.  I expect multiple gids might occur
+-- here.
+wim_join_geoms AS (
+  select a.site_no as wim_id,b.gid
+  from create_geoms a
+  join unique_set b ON(a.geom = b.geom)
+)
+INSERT INTO wim_points_4269 (wim_id,gid)
+SELECT * FROM wim_join_geoms order by wim_id;
+
+-- now that the geometries are paired off, reinstate the fk constraint
+ALTER TABLE ONLY wim_points_4269
+    ADD CONSTRAINT wim_points_4269_gid_fkey FOREIGN KEY (gid)
+        REFERENCES geom_points_4269(gid)
+    ON DELETE CASCADE;
+```
+
+
+# Deploy then test
+
+```
+sqitch deploy
+pg_prove -d wim8_22_43 test/*.sql
 ```
 
 # TODO here:  test.  test case
