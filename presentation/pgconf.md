@@ -847,9 +847,6 @@ sqitch add fix_4269_geoms -m 'Fix metadata vs geom mismatch'
 
 ```
 
-Then edit `deploy/fix_4269_geoms.sql`
-
-
 -------
 
 ```{.sqlpostgresql .tall}
@@ -942,13 +939,60 @@ ALTER TABLE ONLY wim_points_4269
     ON DELETE CASCADE;
 ```
 
+# Make a test for this change
+
+* sqitch has verify
+* but I'm not sure how to plug in testing commands
+
+------
+
+```{.sqlpostgresql .tall}
+SET client_min_messages TO warning;
+CREATE EXTENSION IF NOT EXISTS pgtap;
+RESET client_min_messages;
+
+BEGIN;
+SELECT no_plan();
+-- SELECT plan(1);
+
+SELECT pass('Test fix_4269_geoms!');
+
+-- do the geometries actually match the metadata in all cases?
+PREPARE build_geoms_4269 AS
+  SELECT ST_GeomFromEWKT('SRID=4269;POINT('||a.longitude||' '||a.latitude||')')
+  FROM wim_stations a
+  ORDER BY site_no;
+
+PREPARE existing_geoms_4269 AS
+  SELECT b.geom
+  FROM wim_points_4269 a
+  JOIN geom_points_4269 b USING (gid)
+  ORDER BY wim_id;
+
+-- expect that the metadata matches the stored 4269 geoms
+SELECT results_eq(
+    'build_geoms_4269',
+    'existing_geoms_4269'
+);
+
+SELECT finish();
+ROLLBACK;
+```
+
+
+
 
 # Deploy then test
 
 ```
 sqitch deploy
-pg_prove -d wim8_22_43 test/*.sql
+pg_prove -d wim8_22_43 test/fix_4269_geoms.sql
 ```
+
+
+# Now the projected geometry
+
+FIME here you are
 
 # TODO here:  test.  test case
 
