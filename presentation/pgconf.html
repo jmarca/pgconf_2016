@@ -96,10 +96,10 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <img src="./figures/detectors_on_map_4.png" alt="Focusing on just the highways" /><figcaption>Focusing on just the highways</figcaption>
 </figure>
 </section>
-<section id="to-solve-this" class="slide level1">
-<h1>To solve this</h1>
+<section id="to-segmentize-the-points" class="slide level1">
+<h1>To segmentize the points</h1>
 <figure>
-<img src="./figures/segmentation.png" alt="Segmentize points" /><figcaption>Segmentize points</figcaption>
+<img src="./figures/segmentation.png" alt="How long is each segment of road?" /><figcaption>How long is each segment of road?</figcaption>
 </figure>
 </section>
 <section id="i-wrote-this-sql" class="slide level1">
@@ -193,24 +193,16 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <img src="./figures/brutti_ma_buoni__mg_9082-15.jpg" alt="Brutti ma buoni!" /><figcaption>“Brutti ma buoni!”</figcaption>
 </figure>
 </section>
-<section id="cant-test-that" class="slide level1">
-<h1>Can’t test that!</h1>
-</section>
 <section id="talk-objectives" class="slide level1">
 <h1>Talk objectives</h1>
 <ul>
-<li>Give real-world examples of using pgTAP and Sqitch</li>
+<li>Give real-world examples of using pgTAP and Sqitch
+<ol type="1">
+<li>Cleaning up after a minor SQL disaster</li>
+<li>Modularizing, testing, and porting that monstrous SQL mapping hack</li>
+</ol></li>
 <li>Hoping others can learn from my mistakes.</li>
 </ul>
-</section>
-<section id="the-examples" class="slide level1">
-<h1>The examples</h1>
-<ol type="1">
-<li>Cleaning up after a SQL disaster</li>
-<li>Fixing a bad design choice (another SQL disaster)</li>
-<li>Modularizing, testing, and porting that monstrous SQL mapping hack</li>
-<li>Switching from OSM to official Caltrans map data</li>
-</ol>
 </section>
 <section id="about-me" class="slide level1">
 <h1>About me</h1>
@@ -220,7 +212,6 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <li>Activimetrics LLC</li>
 <li>twitter <span class="citation" data-cites="jmarca">@jmarca</span></li>
 <li>github https://github.com/jmarca</li>
-<li>occasional posts at https://contourline.wordpress.com</li>
 </ul>
 </section>
 <section id="my-postgresql-experience" class="slide level1">
@@ -230,22 +221,12 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <li>Needed a geo-enabled DB</li>
 <li>MySQL didn’t at the time</li>
 <li>PostgreSQL had PostGIS</li>
-<li>Stored and processed streaming GPS data
-<ul>
-<li>(live, from cars, over a CDPD modem!)</li>
-</ul></li>
-</ul>
-</section>
-<section id="also" class="slide level1">
-<h1>Also</h1>
-<ul>
-<li>I set up Slashcode using PostgreSQL</li>
-<li>(That’s also how I learned Perl)</li>
+<li>Application: storing &amp; processing streaming GPS data</li>
 </ul>
 </section>
 <section id="acknowlegments" class="slide level1">
 <h1>Acknowlegments</h1>
-<p>Shout out to the agencies funding my research over the years</p>
+<p>Shout out to the agencies funding our work over the years</p>
 </section>
 <section id="caltrans" class="slide level1">
 <h1>Caltrans</h1>
@@ -274,7 +255,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <section class="slide level1">
 
 <figure>
-<img src="figures/ramp_loops.jpg" alt="Loop detector" /><figcaption>Loop detector</figcaption>
+<img src="figures/ramp_loops.jpg" alt="Six loop detctors!" /><figcaption>Six loop detctors!</figcaption>
 </figure>
 </section>
 <section class="slide level1">
@@ -286,30 +267,21 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <section class="slide level1">
 
 <figure>
-<img src="figures/tube.scaled.jpeg" alt="pneumatic tubes for two-day counts" /><figcaption>pneumatic tubes for two-day counts</figcaption>
+<img src="figures/tube.scaled.jpeg" alt="Pneumatic tubes for two-day counts" /><figcaption>Pneumatic tubes for two-day counts</figcaption>
 </figure>
 </section>
 <section id="part-1-sql-disaster" class="slide level1">
 <h1>Part 1: SQL disaster</h1>
 </section>
-<section id="the-original-project-2002" class="slide level1">
-<h1>The original project (2002)</h1>
+<section id="the-original-project-2003" class="slide level1">
+<h1>The original project (2003)</h1>
 <ul>
 <li>Q: “Can you display our safety model results on a map?”</li>
 <li>A: “Sure”</li>
 </ul>
 </section>
-<section id="vds-loop-data" class="slide level1">
-<h1>VDS Loop Data</h1>
-<pre class="csv"><code>ID,       Fwy,  Dir, District, County, City,  State_PM, Abs_PM, Latitude,  Longitude,   Length, Type, Lanes,    Name,    User_ID_1, User_ID_2, User_ID_3, User_ID_4
-1201044,  133,  S,     12,      59,    36770,  9,        8.991, 33.66184,  -117.7553,     ,      OR,    1,   BARRANCA2,    565,,,
-1201052,  133,  S,     12,      59,    36770,  9,        8.991, 33.66184,  -117.7553,     ,      FR,    1,   BARRANCA 2,   565,,,
-1201054,  133,  S,     12,      59,    36770,  9,        8.991, 33.66184,  -117.7553,   2.685,   ML,    3,   BARRANCA2,    565,,,
-1201058,  133,  N,     12,      59,    36770,  8.866,    8.857, 33.659542, -117.756294,   ,      OR,    1,   BARRANCA1,    551,,,
-...</code></pre>
-</section>
-<section id="solution" class="slide level1">
-<h1>Solution</h1>
+<section id="simple-solution" class="slide level1">
+<h1>Simple solution</h1>
 <ul>
 <li>Put the VDS data into PostgreSQL</li>
 <li>Use PostGIS to make Point geometries</li>
@@ -317,14 +289,23 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <li>Wire up “click” to call up modeling results</li>
 </ul>
 </section>
-<section id="solution-1" class="slide level1">
-<h1>Solution</h1>
+<section id="simple-solution-1" class="slide level1">
+<h1>Simple solution</h1>
 <ul>
 <li>Put the VDS data into PostgreSQL</li>
 <li>Use PostGIS to make Point geometries</li>
 <li><del>Show the points as a layer on a web map</del></li>
 <li><del>Wire up “click” to call up modeling results</del></li>
 </ul>
+</section>
+<section id="vds-loop-metadata" class="slide level1">
+<h1>VDS Loop Metadata</h1>
+<pre class="csv"><code>ID,       Fwy,  Dir, District, County, City,  State_PM, Abs_PM, Latitude,  Longitude,   Length, Type, Lanes,    Name,    User_ID_1, User_ID_2, User_ID_3, User_ID_4
+1201044,  133,  S,     12,      59,    36770,  9,        8.991, 33.66184,  -117.7553,     ,      OR,    1,   BARRANCA2,    565,,,
+1201052,  133,  S,     12,      59,    36770,  9,        8.991, 33.66184,  -117.7553,     ,      FR,    1,   BARRANCA 2,   565,,,
+1201054,  133,  S,     12,      59,    36770,  9,        8.991, 33.66184,  -117.7553,   2.685,   ML,    3,   BARRANCA2,    565,,,
+1201058,  133,  N,     12,      59,    36770,  8.866,    8.857, 33.659542, -117.756294,   ,      OR,    1,   BARRANCA1,    551,,,
+...</code></pre>
 </section>
 <section id="vds-loop-detector-tables" class="slide level1">
 <h1>VDS loop detector tables</h1>
@@ -353,20 +334,6 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <li>make the join table entries</li>
 </ul></li>
 </ul>
-</section>
-<section id="loading-code" class="slide level1">
-<h1>Loading code</h1>
-<div class="sourceCode"><pre class="sourceCode perl"><code class="sourceCode perl"><span class="kw">my</span> <span class="dt">$vds</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_vds_or_die</span>(<span class="dt">$pk</span>,<span class="dt">$data</span>);
-<span class="kw">my</span> <span class="dt">$lon</span> = <span class="dt">$vds</span>-&gt;<span class="dt">longitude</span>;
-<span class="kw">my</span> <span class="dt">$lat</span> = <span class="dt">$vds</span>-&gt;<span class="dt">latitude</span>;
-<span class="kw">my</span> <span class="dt">$new_geoid</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_new_geoid</span>;
-<span class="kw">my</span> <span class="dt">$gid</span>        = <span class="dt">$new_geoid</span>-&gt;<span class="dt">gid</span>;
-<span class="kw">my</span> <span class="dt">$creategeom</span> = <span class="dt">$self</span>-&gt;<span class="dt">create_geompoint_4269</span>(<span class="dt">$lon</span>,<span class="dt">$lat</span>,<span class="dt">$gid</span>);
-<span class="dt">$self</span>-&gt;<span class="dt">join_geom</span>(<span class="dt">$vds</span>,<span class="dt">$gid</span>,<span class="dv">4269</span>);
-<span class="dt">$new_geoid</span> = <span class="dt">$self</span>-&gt;<span class="dt">get_new_geoid</span>();
-<span class="kw">my</span> <span class="dt">$projectedgid</span>        = <span class="dt">$new_geoid</span>-&gt;<span class="dt">gid</span>;
-<span class="kw">my</span> <span class="dt">$projectedpoint</span> = <span class="dt">$self</span>-&gt;<span class="dt">project_geom_4326</span>(<span class="dt">$gid</span>,<span class="dt">$projectedgid</span>);
-<span class="dt">$self</span>-&gt;<span class="dt">join_geom</span>(<span class="dt">$vds</span>,<span class="dt">$projectedgid</span>,<span class="dv">4326</span>);</code></pre></div>
 </section>
 <section class="slide level1">
 
@@ -454,6 +421,21 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 </figure>
 <div class="sourceCode"><pre class="sourceCode perl"><code class="sourceCode perl"><span class="dt">$self</span>-&gt;<span class="dt">join_geom</span>(<span class="dt">$vds</span>,<span class="dt">$projectedgid</span>,<span class="dv">4326</span>);</code></pre></div>
 </section>
+<section id="years-go-by" class="slide level1">
+<h1>Years go by</h1>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/e_g_2003.jpg" />
+</figure>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/2010_10_15.jpg" />
+</figure>
+</section>
 <section id="calvad-project" class="slide level1">
 <h1>2010 CalVAD project</h1>
 </section>
@@ -490,7 +472,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 </ul></li>
 </ul>
 </section>
-<section id="years-go-by" class="slide level1">
+<section id="years-go-by-1" class="slide level1">
 <h1>Years go by</h1>
 </section>
 <section class="slide level1">
@@ -505,33 +487,56 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <img src="./figures/2015_11_11.jpg" />
 </figure>
 </section>
-<section id="fall-2015-transfer-db" class="slide level1">
-<h1>Fall 2015, transfer DB</h1>
+<section id="the-calvad-project-is-ending" class="slide level1">
+<h1>The CalVAD project is ending</h1>
 <ul>
-<li>Some database tables are way too big to copy</li>
-<li>Many are manageable, but</li>
-<li>Learning by doing</li>
-<li>Teach my ARB counterpart what to do:
+<li>Time to transfer results and data to customer</li>
+<li>Some database tables are way too big to download</li>
+<li>Many are manageable, but …</li>
+</ul>
+</section>
+<section id="re-run-db-populate-code" class="slide level1">
+<h1>Re-run DB populate code</h1>
+<ul>
+<li>Clean up, modernize, test old code</li>
+<li>Teach my ARB counterpart how to:
 <ul>
 <li>Load the required software</li>
 <li>Download the data</li>
 <li>Run the code</li>
 </ul></li>
+<li>“Learning by doing”</li>
 </ul>
 </section>
-<section id="no-metadata-overlap" class="slide level1">
-<h1>No metadata overlap…</h1>
+<section id="first-task-load-the-vds-detector-metadata-and-data" class="slide level1">
+<h1>First task, load the VDS detector metadata and data</h1>
 <ul>
 <li>My DB had processed through 2012</li>
-<li>ARB downloaded 2013, 2014, 2015 data</li>
+<li>Customer downloaded 2013—2015 data and metadata</li>
 <li>I cleaned up <a href="https://github.com/jmarca/CalVAD-PEMS-StationsParse">my perl code</a> (now using Dist::Zilla)</li>
-<li>I added tests to perl code</li>
-<li>On ARB server, we
+<li>I walked my counterpart through
 <ul>
-<li>Installed perl, etc</li>
-<li>Installed PostgreSQL, PostGIS</li>
-<li>Parsed and loaded 2013, 2014, 2015 VDS metadata</li>
+<li>Installing necessary system software</li>
+<li>Installing PostgreSQL, PostGIS</li>
+<li>Parsing and loading data</li>
 </ul></li>
+</ul>
+</section>
+<section id="weeks-pass" class="slide level1">
+<h1>Weeks pass</h1>
+<ul>
+<li>Regular phone calls working through CalVAD code</li>
+<li>Updating old code</li>
+<li>Populating DB tables</li>
+<li>Processing data</li>
+</ul>
+</section>
+<section id="then-we-get-to-the-wim-data-and-metadata" class="slide level1">
+<h1>Then we get to the WIM data and metadata</h1>
+<ul>
+<li>For WIM sites, about the same data now as in 2010</li>
+<li>I decided <em>not</em> to upgrade/modernize my WIM perl code</li>
+<li>I decided <em>instead</em> to just copy the WIM metadata to ARB</li>
 </ul>
 </section>
 <section class="slide level1">
@@ -539,24 +544,6 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <figure>
 <img src="./figures/add_wim_stations.png" alt="Recall the DB tables…" /><figcaption>Recall the DB tables…</figcaption>
 </figure>
-</section>
-<section id="weeks-pass" class="slide level1">
-<h1>Weeks pass</h1>
-<ul>
-<li>Regular phone calls working through CalVAD code</li>
-<li>Setting up software</li>
-<li>Populating DB tables</li>
-<li>Processing data</li>
-</ul>
-</section>
-<section id="time-to-use-the-wim-detector-metadata" class="slide level1">
-<h1>Time to use the WIM detector metadata</h1>
-<ul>
-<li>For WIM sites, about the same data now as in 2010</li>
-<li>Slower pace of change</li>
-<li>I decided <em>not</em> to upgrade/modernize my WIM perl code</li>
-<li>I decided <em>instead</em> to just copy the WIM metadata to ARB</li>
-</ul>
 </section>
 <section id="oops" class="slide level1">
 <h1>Oops!</h1>
@@ -579,11 +566,14 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <section id="fix-this" class="slide level1">
 <h1>Fix this</h1>
 <ul>
-<li>Sqitch to organize the fix</li>
 <li>pgTAP
 <ul>
 <li>to prove there is a problem</li>
 <li>to prove the fix worked</li>
+</ul></li>
+<li>Sqitch
+<ul>
+<li>to organize the fix</li>
 </ul></li>
 </ul>
 </section>
@@ -596,23 +586,8 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <li>docs: <a href="http://pgtap.org" class="uri">http://pgtap.org</a></li>
 </ul>
 </section>
-<section id="pgtap-hello-world" class="slide level1">
-<h1>pgTAP “Hello World”</h1>
-<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SET</span> client_min_messages <span class="kw">TO</span> warning;
-<span class="kw">CREATE</span> EXTENSION IF <span class="kw">NOT</span> <span class="kw">EXISTS</span> pgtap;
-<span class="kw">RESET</span> client_min_messages;
-
-<span class="kw">BEGIN</span>;
-<span class="kw">SELECT</span> no_plan();
-<span class="co">-- SELECT plan(1);</span>
-
-<span class="kw">SELECT</span> pass(<span class="st">&#39;Hello Brooklyn!&#39;</span>);
-
-<span class="kw">SELECT</span> finish();
-<span class="kw">ROLLBACK</span>;</code></pre></div>
-</section>
-<section id="testing" class="slide level1">
-<h1>Testing</h1>
+<section id="what-does-it-do" class="slide level1">
+<h1>What does it do?</h1>
 <blockquote>
 <p>The basic purpose of pgTAP … is to print out either “ok #” or “not ok #”, depending on whether a given test succeeded or failed.</p>
 </blockquote>
@@ -621,8 +596,15 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <section id="pgtap-basic-usage" class="slide level1">
 <h1>pgTAP basic usage</h1>
 <ul>
-<li>As a simple test script</li>
+<li>As a simple test script, run with pg_prove</li>
 <li>In xUnit-style test functions that you install into your database and run all at once</li>
+</ul>
+</section>
+<section id="pgtap-basic-usage-1" class="slide level1">
+<h1>pgTAP basic usage</h1>
+<ul>
+<li>As a simple test script, run with pg_prove</li>
+<li><del>In xUnit-style test functions that you install into your database and run all at once</del></li>
 </ul>
 </section>
 <section id="pgtap-advanced-features" class="slide level1">
@@ -640,12 +622,6 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <section id="i-dont-really-know-what-that-previous-slide-means" class="slide level1">
 <h1>I don’t really know what that previous slide means</h1>
 </section>
-<section class="slide level1">
-
-<figure>
-<img src="./figures/shinola_container.png" alt="This is a can of Shinola, a shoe polish brand that went out of business" /><figcaption>This is a can of Shinola, a shoe polish brand that went out of business</figcaption>
-</figure>
-</section>
 <section id="my-testing-needs" class="slide level1">
 <h1>My testing needs</h1>
 <ol type="1">
@@ -655,13 +631,6 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <li>Make sure each WIM station has a geometry</li>
 <li>Verify metadata (lat,lon) matches the linked geometry</li>
 </ol>
-</section>
-<section id="testing-approach" class="slide level1">
-<h1>Testing approach</h1>
-<ul>
-<li>Simple test script</li>
-<li>Run the script using pg_prove</li>
-</ul>
 </section>
 <section id="pg_prove" class="slide level1">
 <h1>pg_prove</h1>
@@ -676,19 +645,20 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <p>… then later …</p>
 <pre><code>cpanm -S --self-upgrade</code></pre>
 </section>
+<section id="pgtap-1" class="slide level1">
+<h1>pgTAP</h1>
+</section>
 <section id="testing-tables-schemas" class="slide level1">
 <h1>Testing tables, schemas</h1>
 <ul>
-<li>has_schema()</li>
-<li>has_table()</li>
-<li>schemas_are()</li>
-<li>tables_are()</li>
+<li>has_schema(), has_table()</li>
+<li>schemas_are(), tables_are()</li>
 </ul>
 </section>
 <section id="the-has_-test-variants" class="slide level1">
 <h1>The ‘has_’ test variants</h1>
 <ul>
-<li>Checks that something exists</li>
+<li>Check that something exists</li>
 <li>The test fails if that thing is not in the database</li>
 <li>For example</li>
 </ul>
@@ -697,7 +667,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <section id="the-_are-test-variants" class="slide level1">
 <h1>The ‘_are’ test variants</h1>
 <ul>
-<li>Checks that the DB contains exactly the list you specify</li>
+<li>Check that the DB contains exactly the list you specify</li>
 <li>Will fail if something is missing</li>
 <li>Will fail if something extra exists</li>
 <li>For example</li>
@@ -718,16 +688,15 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <span class="kw">SELECT</span> has_table(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4269&#39;</span>,<span class="st">&#39;there is a geom_points_4269 table&#39;</span>);
 <span class="kw">SELECT</span> has_table(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4326&#39;</span>,<span class="st">&#39;there is a geom_points_4326 table&#39;</span>);</code></pre></div>
 </section>
-<section id="quick-demo" class="slide level1">
-<h1>quick demo</h1>
+<section id="demo" class="slide level1">
+<h1>demo</h1>
 </section>
-<section id="testing-table-characteristics" class="slide level1">
-<h1>Testing table characteristics</h1>
+<section id="testing-table-relationships" class="slide level1">
+<h1>Testing table relationships</h1>
 <ul>
-<li>col_is_pk()</li>
-<li>has_pk()</li>
-<li>col_is_fk()</li>
-<li>has_fk()</li>
+<li>col_is_pk(), has_pk()</li>
+<li>col_is_fk(), has_fk()</li>
+<li>indexes_are()</li>
 </ul>
 </section>
 <section id="primary-keys" class="slide level1">
@@ -736,15 +705,31 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4269&#39;</span>,<span class="st">&#39;gid&#39;</span>, <span class="st">&#39;geom points 4269 gid is pk&#39;</span> );
 <span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4326&#39;</span>,<span class="st">&#39;gid&#39;</span>, <span class="st">&#39;geom points 4326 gid is pk&#39;</span> );
 
-<span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4326&#39;</span>,ARRAY[<span class="st">&#39;gid&#39;</span>,<span class="st">&#39;wim_id&#39;</span>], <span class="st">&#39;geom points 4326 gid is pk&#39;</span> );
-<span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4269&#39;</span>,ARRAY[<span class="st">&#39;gid&#39;</span>,<span class="st">&#39;wim_id&#39;</span>], <span class="st">&#39;geom points 4269 gid is pk&#39;</span> );</code></pre></div>
+<span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4326&#39;</span>,<span class="st">&#39;wim_id&#39;</span>, <span class="st">&#39;geom points 4326 gid is pk&#39;</span> );
+<span class="kw">SELECT</span> col_is_pk(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4269&#39;</span>,<span class="st">&#39;wim_id&#39;</span>, <span class="st">&#39;geom points 4269 gid is pk&#39;</span> );</code></pre></div>
 </section>
-<section id="quick-demo-1" class="slide level1">
-<h1>quick demo</h1>
+<section id="demo-1" class="slide level1">
+<h1>demo</h1>
+</section>
+<section id="indexes-or-indices" class="slide level1">
+<h1>Indexes or Indices?</h1>
+<ul>
+<li>use `indexes_are(:schema,:table,ARRAY[:indexes],:description)</li>
+<li>Don’t forget the list of indices is an ARRAY</li>
+</ul>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_stations&#39;</span>,
+                   ARRAY[<span class="st">&#39;wim_stations_pkey&#39;</span>],<span class="st">&#39;wim_stations has index&#39;</span> );
+<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4269&#39;</span>,
+                   ARRAY[<span class="st">&#39;geom_points_4269_pkey&#39;</span>,<span class="st">&#39;geom_points_4269_geom_index&#39;</span>],
+                   <span class="st">&#39;geom_points_4269 has index&#39;</span> );</code></pre></div>
 </section>
 <section id="testing-foreign-keys" class="slide level1">
 <h1>Testing foreign keys</h1>
-<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SELECT</span> fk_ok( <span class="ch">:</span>fk_schema, <span class="ch">:</span>fk_table,   <span class="ch">:</span>fk_columns,
+<ul>
+<li>fk_ok() is a very cool function</li>
+<li>checks table to table relationships in one go</li>
+</ul>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SELECT</span> fk_ok( <span class="ch">:</span>fk_schema,  <span class="ch">:</span>fk_table, <span class="ch">:</span>fk_columns,
               <span class="ch">:</span>pk_schema,  <span class="ch">:</span>pk_table, <span class="ch">:</span>pk_columns,
               <span class="ch">:</span>description );
 </code></pre></div>
@@ -757,6 +742,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
     <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_points_4269&#39;</span>,<span class="st">&#39;wim_id&#39;</span>,
     <span class="st">&#39;wim_points_4269 connects to wim_stations&#39;</span>
 );
+
 <span class="kw">SELECT</span> fk_ok(
     <span class="st">&#39;public&#39;</span>,<span class="st">&#39;geom_points_4269&#39;</span>,<span class="st">&#39;gid&#39;</span>,
     <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_points_4269&#39;</span>,<span class="st">&#39;gid&#39;</span>,
@@ -764,32 +750,21 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 );
 
 
-<span class="co">--4326</span>
+<span class="co">-- 4326</span>
 <span class="kw">SELECT</span> fk_ok(
     <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_stations&#39;</span>,<span class="st">&#39;site_no&#39;</span>,
     <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_points_4326&#39;</span>,<span class="st">&#39;wim_id&#39;</span>,
     <span class="st">&#39;wim_points_4326 connects to wim_stations&#39;</span>
 );
+
 <span class="kw">SELECT</span> fk_ok(
     <span class="st">&#39;public&#39;</span>,<span class="st">&#39;geom_points_4326&#39;</span>,<span class="st">&#39;gid&#39;</span>,
     <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_points_4326&#39;</span>,<span class="st">&#39;gid&#39;</span>,
     <span class="st">&#39;wim_points_4326 connects to geom_points_4326&#39;</span>
 );</code></pre></div>
 </section>
-<section id="quick-demo-2" class="slide level1">
-<h1>quick demo</h1>
-</section>
-<section id="testing-indices" class="slide level1">
-<h1>Testing indices</h1>
-<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="co">-- are indexes set up?</span>
-<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_stations&#39;</span>, <span class="st">&#39;site_no&#39;</span>,ARRAY[<span class="ch">:</span>indexes], <span class="st">&#39;wim_stations has index&#39;</span> );
-<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4269&#39;</span>,<span class="st">&#39;gid&#39;</span>,  ARRAY[<span class="ch">:</span>indexes],<span class="st">&#39;geom_points_4269 has index&#39;</span> );
-<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;geom_points_4326&#39;</span>,<span class="st">&#39;gid&#39;</span>,  ARRAY[<span class="ch">:</span>indexes],<span class="st">&#39;geom_points_4326 has index&#39;</span> );
-<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4269&#39;</span> ,<span class="st">&#39;gid&#39;</span>,  ARRAY[<span class="ch">:</span>indexes],<span class="st">&#39;wim_points_4269 has index&#39;</span> );
-<span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_points_4326&#39;</span> ,<span class="st">&#39;gid&#39;</span>,  ARRAY[<span class="ch">:</span>indexes],<span class="st">&#39;wim_points_4326 has index&#39;</span> );</code></pre></div>
-</section>
-<section id="quick-demo-3" class="slide level1">
-<h1>quick demo</h1>
+<section id="demo-should-fail" class="slide level1">
+<h1>demo (should fail)</h1>
 </section>
 <section id="not-limited-to-simple-tests" class="slide level1">
 <h1>Not limited to simple tests</h1>
@@ -803,8 +778,8 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <span class="kw">SELECT</span> results_eq( <span class="ch">:</span>cursor, <span class="ch">:</span>array,  <span class="ch">:</span>description );</code></pre></div>
 <p>results_eq() is a workhorse for my kind of problems.</p>
 </section>
-<section id="caveat" class="slide level1">
-<h1>Caveat</h1>
+<section id="results_eq-caveats" class="slide level1">
+<h1>results_eq() Caveats</h1>
 <ul>
 <li>Need to quote <code>:sql</code> arguments
 <ul>
@@ -821,16 +796,16 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="co">-- make sure join relations are all there</span>
 <span class="kw">select</span> results_eq(
     <span class="st">&#39;select site_no from wim_stations order by site_no&#39;</span>,
-    <span class="st">&#39;select wim_site from wim_points_4269 order by wim_site&#39;</span>
+    <span class="st">&#39;select wim_id from wim_points_4269 order by wim_id&#39;</span>
 );
 
 <span class="kw">select</span> results_eq(
     <span class="st">&#39;select site_no from wim_stations order by site_no&#39;</span>,
-    <span class="st">&#39;select wim_site from wim_points_4326 order by wim_site&#39;</span>
+    <span class="st">&#39;select wim_id from wim_points_4326 order by wim_id&#39;</span>
 );</code></pre></div>
 </section>
-<section id="quick-demo-4" class="slide level1">
-<h1>quick demo</h1>
+<section id="demo-2" class="slide level1">
+<h1>demo</h1>
 </section>
 <section id="geometries-vs-metadata" class="slide level1">
 <h1>Geometries vs metadata</h1>
@@ -874,87 +849,776 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
     <span class="st">&#39;existing_geoms_4326&#39;</span>
 );</code></pre></div>
 </section>
-<section id="quick-demo-5" class="slide level1">
-<h1>quick demo</h1>
+<section id="demo-3" class="slide level1">
+<h1>demo</h1>
 </section>
-<section id="part-2-a-bad-design-decision" class="slide level1">
-<h1>Part 2: A bad design decision</h1>
+<section id="so-it-is-broken.-how-do-i-fix-it" class="slide level1">
+<h1>So, it is broken. How do I fix it?</h1>
 </section>
-<section id="vds-data-changes" class="slide level1">
-<h1>VDS data changes</h1>
+<section id="use-sqitch" class="slide level1">
+<h1>use Sqitch</h1>
+<p>(No ‘u’)</p>
+</section>
+<section id="what-is-sqitch" class="slide level1">
+<h1>What is Sqitch?</h1>
 <ul>
-<li>Regular releases of new metadata files</li>
-<li>Need to download and parse the metadata files for
+<li>Also by David Wheeler</li>
+<li>Docs: <a href="http://sqitch.org/" class="uri">http://sqitch.org/</a></li>
+<li>Code: <a href="https://github.com/theory/sqitch" class="uri">https://github.com/theory/sqitch</a></li>
+<li>A database change management application.</li>
+<li>Supports PostgreSQL 8.4+,
 <ul>
-<li>new loop detectors coming on line</li>
-<li>missing loop detectors that were retired</li>
+<li>(also SQLite 3.7.11+, MySQL 5.0+, Oracle 10g+, Firebird 2.0+, and Vertica 6.0+.)</li>
+</ul></li>
+<li>Feels like:
+<ul>
+<li>git when you create and store changes to your plan</li>
+<li>a package manager when you deploy, require dependencies, etc</li>
 </ul></li>
 </ul>
 </section>
-<section id="metadata" class="slide level1">
-<h1>Metadata</h1>
-<table style="width:86%;">
-<colgroup>
-<col style="width: 43%" />
-<col style="width: 43%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th>Things that don’t change</th>
-<th>Things that change</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><p>ID</p></td>
-<td><p>State PM</p></td>
-</tr>
-<tr class="even">
-<td><p>Fwy</p></td>
-<td><p>Absolute PM</p></td>
-</tr>
-<tr class="odd">
-<td><p>Direction</p></td>
-<td><p>Length</p></td>
-</tr>
-<tr class="even">
-<td><p>District</p></td>
-<td><p>User ID fields</p></td>
-</tr>
-<tr class="odd">
-<td><p>County</p></td>
-<td></td>
-</tr>
-<tr class="even">
-<td><p>City</p></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td><p>Latitude</p></td>
-<td></td>
-</tr>
-<tr class="even">
-<td><p>Longitude</p></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td><p>Type</p></td>
-<td></td>
-</tr>
-<tr class="even">
-<td><p>Name</p></td>
-<td></td>
-</tr>
-</tbody>
-</table>
+<section id="sqitch-documentation-is-great" class="slide level1">
+<h1>Sqitch documentation is great</h1>
+<p>Really. Its superb.</p>
 </section>
-<section id="part-3-modularize-and-test-detector-geolocationsegmentation-code" class="slide level1">
-<h1>Part 3: modularize and test detector geolocation/segmentation code</h1>
-<p>Show the big code and how I use Sqitch inter-package dependencies</p>
+<section id="sqitch-hello-world" class="slide level1">
+<h1>Sqitch “Hello World”</h1>
+<div class="sourceCode"><pre class="sourceCode bash"><code class="sourceCode bash"><span class="kw">sqitch</span> init calvad_wim_geometries --uri https://github.com/jmarca/calvad_wim_geometries --engine pg
+<span class="kw">createdb</span> -U slash -h 127.0.0.1 brokendb
+<span class="kw">sqitch</span> target add brokendb db:pg://slash@127.0.0.1/brokendb
+<span class="kw">sqitch</span> engine add pg brokendb
+<span class="kw">sqitch</span> add brooklyn  -m <span class="st">&#39;Hello Brooklyn!&#39;</span>
+<span class="kw">sqitch</span> deploy</code></pre></div>
 </section>
-<section id="part-4-migrate-to-caltrans-state-highway-network" class="slide level1">
-<h1>part 4: migrate to caltrans state highway network</h1>
-<p>Not sure what the point of this one is in terms of sqitch and pgtap usage</p>
+<section id="using-sqitch-to-fix-things" class="slide level1">
+<h1>Using sqitch to fix things</h1>
+<ol start="0" type="1">
+<li>Make, populate a test “broken” database</li>
+<li>Invoke <code>sqitch add</code> to generate scaffolding</li>
+<li>Edit the deploy, verify, rollback, and test files</li>
+<li>See if it works</li>
+<li>Repeat steps 2 and 3</li>
+</ol>
+</section>
+<section id="broken-db" class="slide level1">
+<h1>Broken db</h1>
+<p>generated with mocha test script</p>
+<div class="sourceCode"><pre class="sourceCode bash"><code class="sourceCode bash"><span class="kw">./node_modules/.bin/mocha</span> test/test_deploy.js --timeout 0</code></pre></div>
+</section>
+<section id="add-a-sqitch-change" class="slide level1">
+<h1>Add a sqitch change</h1>
+<pre><code>sqitch add fix_4269_geoms -m &#39;Fix metadata vs geom mismatch&#39;
+</code></pre>
+<ul>
+<li>Similar to a <code>git add ...</code></li>
+<li>Generates
+<ul>
+<li>test/fix_4269_geoms.sql</li>
+<li>deploy/fix_4269_geoms.sql</li>
+<li>verify/fix_4269_geoms.sql</li>
+<li>revert/fix_4269_geoms.sql</li>
+</ul></li>
+</ul>
+</section>
+<section id="make-a-test-using-pgtap" class="slide level1">
+<h1>Make a test using pgTAP</h1>
+<ul>
+<li>sqitch has verify</li>
+<li>but not that useful here</li>
+</ul>
+</section>
+<section id="demo-4" class="slide level1">
+<h1>demo</h1>
+</section>
+<section class="slide level1">
+
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql tall"><code class="sourceCode sqlpostgresql"><span class="kw">SET</span> client_min_messages <span class="kw">TO</span> warning;
+<span class="kw">CREATE</span> EXTENSION IF <span class="kw">NOT</span> <span class="kw">EXISTS</span> pgtap;
+<span class="kw">RESET</span> client_min_messages;
+
+<span class="kw">BEGIN</span>;
+<span class="kw">SELECT</span> no_plan();
+<span class="co">-- SELECT plan(1);</span>
+
+<span class="kw">SELECT</span> pass(<span class="st">&#39;Test fix_4269_geoms!&#39;</span>);
+
+<span class="co">-- do the geometries actually match the metadata in all cases?</span>
+<span class="kw">PREPARE</span> build_geoms_4269 <span class="kw">AS</span>
+  <span class="kw">SELECT</span> ST_GeomFromEWKT(<span class="st">&#39;SRID=4269;POINT(&#39;</span>||a.longitude||<span class="st">&#39; &#39;</span>||a.latitude||<span class="st">&#39;)&#39;</span>)
+  <span class="kw">FROM</span> wim_stations a
+  <span class="kw">ORDER</span> <span class="kw">BY</span> site_no;
+
+<span class="kw">PREPARE</span> existing_geoms_4269 <span class="kw">AS</span>
+  <span class="kw">SELECT</span> b.geom
+  <span class="kw">FROM</span> wim_points_4269 a
+  <span class="kw">JOIN</span> geom_points_4269 b <span class="kw">USING</span> (gid)
+  <span class="kw">ORDER</span> <span class="kw">BY</span> wim_id;
+
+<span class="co">-- expect that the metadata matches the stored 4269 geoms</span>
+<span class="kw">SELECT</span> results_eq(
+    <span class="st">&#39;build_geoms_4269&#39;</span>,
+    <span class="st">&#39;existing_geoms_4269&#39;</span>
+);
+
+<span class="kw">SELECT</span> finish();
+<span class="kw">ROLLBACK</span>;</code></pre></div>
+</section>
+<section id="deployfix_4269_geoms.sql" class="slide level1">
+<h1>deploy/fix_4269_geoms.sql</h1>
+</section>
+<section class="slide level1">
+
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql tall"><code class="sourceCode sqlpostgresql"><span class="kw">BEGIN</span>;
+<span class="co">-- first, clear the decks</span>
+<span class="kw">drop</span> <span class="kw">table</span>  wim_points_4269;
+
+<span class="co">-- recreate without any FK to geom_points</span>
+<span class="kw">CREATE</span> <span class="kw">TABLE</span> wim_points_4269 (
+    gid <span class="dt">integer</span> <span class="kw">NOT</span> <span class="kw">NULL</span>,
+    wim_id <span class="dt">integer</span> <span class="kw">NOT</span> <span class="kw">NULL</span>  <span class="kw">primary</span> <span class="kw">key</span> <span class="kw">REFERENCES</span> wim_stations (site_no)   <span class="kw">ON</span> <span class="kw">DELETE</span> <span class="kw">CASCADE</span>
+);
+
+<span class="co">-- get rid of gid relationship in geom_points</span>
+<span class="kw">ALTER</span> <span class="kw">TABLE</span> <span class="kw">ONLY</span> geom_points_4269
+    <span class="kw">DROP</span> <span class="kw">CONSTRAINT</span> geom_points_4269_gid_fkey;
+<span class="kw">CREATE</span> <span class="kw">SEQUENCE</span> geom_points_4269_gid_seq;
+<span class="kw">ALTER</span> <span class="kw">TABLE</span> geom_points_4269
+    <span class="kw">ALTER</span> <span class="kw">COLUMN</span> gid <span class="kw">SET</span> <span class="kw">DEFAULT</span>
+    <span class="fu">nextval</span>(<span class="st">&#39;geom_points_4269_gid_seq&#39;</span>);
+<span class="kw">ALTER</span> <span class="kw">SEQUENCE</span> geom_points_4269_gid_seq OWNED <span class="kw">BY</span> geom_points_4269.gid;
+<span class="kw">SELECT</span> <span class="fu">setval</span>(<span class="st">&#39;geom_points_4269_gid_seq&#39;</span>,<span class="fu">nextval</span>(<span class="st">&#39;geom_ids_gid_seq&#39;</span>));
+
+<span class="co">-- try to fix the broken geometries</span>
+
+<span class="co">-- create geoms holds geometries created from the metadata</span>
+<span class="kw">WITH</span> create_geoms <span class="kw">AS</span> (
+  <span class="kw">SELECT</span> site_no, ST_GeomFromEWKT(<span class="st">&#39;SRID=4269;POINT(&#39;</span>||a.longitude||<span class="st">&#39; &#39;</span>||a.latitude||<span class="st">&#39;)&#39;</span>) <span class="kw">as</span> geom
+  <span class="kw">FROM</span> wim_stations a
+  <span class="kw">ORDER</span> <span class="kw">BY</span> site_no
+),
+
+<span class="co">-- some of the geoms are likely repeated.  only make one</span>
+distinct_geoms <span class="kw">AS</span> (
+  <span class="kw">select</span> <span class="kw">distinct</span> geom <span class="kw">from</span> create_geoms
+),
+
+<span class="co">-- Only keep those points that are not already in the</span>
+<span class="co">-- geom_points_4269 table</span>
+not_in_geoms_table <span class="kw">AS</span> (
+  <span class="kw">select</span> a.geom
+  <span class="kw">from</span> distinct_geoms a
+  <span class="kw">left</span> <span class="kw">outer</span> <span class="kw">join</span> geom_points_4269 b <span class="kw">on</span> (a.geom=b.geom)
+  <span class="kw">where</span> b.geom <span class="kw">is</span> <span class="kw">null</span>
+),
+
+<span class="co">-- insert the new geometries</span>
+inserted_geoms <span class="kw">AS</span> (
+  <span class="kw">INSERT</span> <span class="kw">INTO</span> geom_points_4269 (geom)
+  <span class="kw">SELECT</span> geom
+  <span class="kw">FROM</span> not_in_geoms_table
+    RETURNING geom,gid
+),
+
+<span class="co">-- combine both new and old for pairing off in join table</span>
+new_and_old <span class="kw">as</span> (
+  <span class="kw">select</span> a.geom,a.gid
+  <span class="kw">from</span> geom_points_4269 a
+  <span class="kw">join</span> distinct_geoms b <span class="kw">on</span> (a.geom=b.geom)
+  <span class="kw">union</span>
+  <span class="kw">select</span> aa.geom,aa.gid
+  <span class="kw">from</span> inserted_geoms aa
+  <span class="kw">join</span> distinct_geoms b <span class="kw">on</span> (aa.geom=b.geom)
+),
+
+<span class="co">-- there is no guarantee that geometries in</span>
+<span class="co">-- geom_points_4269 are unique</span>
+<span class="co">-- so reduce new_and_old using DISTINCT</span>
+unique_set <span class="kw">as</span> (
+  <span class="kw">select</span> <span class="kw">distinct</span> <span class="kw">min</span>(gid) <span class="kw">as</span> gid,geom
+  <span class="kw">from</span> new_and_old
+  <span class="kw">group</span> <span class="kw">by</span> geom
+),
+
+<span class="co">-- finally, join wim site numbers with the newly created gid values by</span>
+<span class="co">-- joining the tables on geom.  I expect multiple gids might occur</span>
+<span class="co">-- here.</span>
+wim_join_geoms <span class="kw">AS</span> (
+  <span class="kw">select</span> a.site_no <span class="kw">as</span> wim_id,b.gid
+  <span class="kw">from</span> create_geoms a
+  <span class="kw">join</span> unique_set b <span class="kw">ON</span>(a.geom = b.geom)
+)
+<span class="kw">INSERT</span> <span class="kw">INTO</span> wim_points_4269 (wim_id,gid)
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> wim_join_geoms <span class="kw">order</span> <span class="kw">by</span> wim_id;
+
+<span class="co">-- now that the geometries are paired off, reinstate the fk constraint</span>
+<span class="kw">ALTER</span> <span class="kw">TABLE</span> <span class="kw">ONLY</span> wim_points_4269
+    <span class="kw">ADD</span> <span class="kw">CONSTRAINT</span> wim_points_4269_gid_fkey <span class="kw">FOREIGN</span> <span class="kw">KEY</span> (gid)
+        <span class="kw">REFERENCES</span> geom_points_4269(gid)
+    <span class="kw">ON</span> <span class="kw">DELETE</span> <span class="kw">CASCADE</span>;</code></pre></div>
+</section>
+<section id="deploy-then-test" class="slide level1">
+<h1>Deploy then test</h1>
+<pre><code>sqitch deploy
+pg_prove -d wim8_22_43 test/fix_4269_geoms.sql</code></pre>
+</section>
+<section id="now-the-projected-geometry" class="slide level1">
+<h1>Now the projected geometry</h1>
+</section>
+<section id="demo-5" class="slide level1">
+<h1>demo</h1>
+</section>
+<section id="client-view" class="slide level1">
+<h1>Client view</h1>
+<ul>
+<li>I ship out the change as a git repo to the client</li>
+<li>He
+<ul>
+<li>clones it,</li>
+<li>runs the test,</li>
+<li>sqitch deploy</li>
+<li>runs test again to verify fix</li>
+</ul></li>
+</ul>
+</section>
+<section id="demo-6" class="slide level1">
+<h1>demo</h1>
+<pre><code>pg_prove -d wim15_51_59 test/fix_4269_geoms.sql test/fix_4326_geoms.sql
+sqitch deploy --to fix_4269_geoms db:pg:wim15_51_59
+pg_prove -d wim15_51_59 test/fix_4269_geoms.sql test/fix_4326_geoms.sql
+sqitch deploy  db:pg:wim15_51_59
+pg_prove -d wim15_51_59 test/fix_4269_geoms.sql test/fix_4326_geoms.sql</code></pre>
+</section>
+<section id="part-2-modularize-and-test-detector-segmentation-code" class="slide level1">
+<h1>Part 2: Modularize and test detector segmentation code</h1>
+<ul>
+<li>This example is about cleaning that monstrous SQL hack</li>
+<li>Goal was to estimate segments “underneath” each loop detector</li>
+<li>But we had to use OpenStreetMap</li>
+</ul>
+</section>
+<section id="sqitch-to-the-rescue" class="slide level1">
+<h1>Sqitch to the rescue</h1>
+<ul>
+<li>The biggest problem was the lack of clarity</li>
+<li>Using sqitch allowed us to organize each step of the process</li>
+<li>Worked in <code>verify</code> and <code>test</code> wherever needed</li>
+<li><code>revert</code> scripts actually work to rollback changes</li>
+</ul>
+</section>
+<section id="cross-project-dependencies" class="slide level1">
+<h1>Cross-project dependencies</h1>
+<ul>
+<li>A sqitch change can depend on other changes</li>
+<li>Those changes can be in other projects</li>
+</ul>
+</section>
+<section id="calvad_db_geoextensions" class="slide level1">
+<h1>calvad_db_geoextensions</h1>
+<pre><code>%syntax-version=1.0.0
+%project=calvad_db_geoextensions
+%uri=https://github.com/jmarca/calvad_db_geoextensions
+
+geoextensions 2016-04-10T15:38:22Z James E. Marca &lt;james@activimetrics.com&gt; # geoextensions</code></pre>
+</section>
+<section id="detectors_schema" class="slide level1">
+<h1>detectors_schema</h1>
+<pre><code>%syntax-version=1.0.0
+%project=detectors_schema
+%uri=https://github.com/jmarca/detectors_schema
+
+newtbmap 2016-04-11T18:21:11Z James E. Marca &lt;james@activimetrics.com&gt; # newtbmap schema</code></pre>
+</section>
+<section id="tvd" class="slide level1">
+<h1>tvd</h1>
+<pre><code>%syntax-version=1.0.0
+%project=tvd
+%uri=https://github.com/jmarca/tvd
+
+tvd [detectors_schema:newtbmap calvad_db_geoextensions:geoextensions] 2016-04-11T18:13:29Z James E. Marca &lt;james@activimetrics.com&gt; # tvd table
+populate_tvd [tvd] 2016-04-11T18:36:17Z James E. Marca &lt;james@activimetrics.com&gt; # populate tvd with initial data</code></pre>
+</section>
+<section id="demo-7" class="slide level1">
+<h1>demo</h1>
+<p>Deploying tvd:tvd will fail unless dependencies are met</p>
+</section>
+<section id="clean-up-task" class="slide level1">
+<h1>Clean up task</h1>
+<ul>
+<li>Pretty tedious</li>
+<li>Pick apart scripts into chunks
+<ul>
+<li>copying data</li>
+<li>deploying OpenStreetMap</li>
+<li>cleaning up route relations</li>
+<li>etc</li>
+</ul></li>
+<li>Convert chunks into sqitch changes
+<ul>
+<li>clear dependencies on other packages</li>
+<li>generally multiple changes per package</li>
+<li>Write verify, test, revert sql</li>
+</ul></li>
+<li>Deploy each package to the database</li>
+<li>Verify and test with each deployed change</li>
+</ul>
+</section>
+<section id="example" class="slide level1">
+<h1>Example</h1>
+</section>
+<section id="before" class="slide level1">
+<h1>Before</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">DROP</span> <span class="kw">table</span> if <span class="kw">exists</span> tempseg.relation_direction_geometries;
+
+<span class="kw">CREATE</span> <span class="kw">SEQUENCE</span> tempseg_relation_direction_geometries_seq <span class="kw">increment</span> <span class="kw">by</span> <span class="dv">2</span>;
+
+<span class="kw">SELECT</span> rr.id <span class="kw">as</span> relation_id,sequence_id,linestring,
+<span class="fu">nextval</span>(<span class="st">&#39;tempseg_relation_direction_geometries_seq&#39;</span>) <span class="kw">as</span> ordering,
+       <span class="kw">CASE</span> <span class="kw">WHEN</span> rr.direction = <span class="st">&#39;roles&#39;</span> <span class="kw">THEN</span>
+            <span class="kw">CASE</span> <span class="kw">WHEN</span> m.member_role=<span class="st">&#39;&#39;</span> <span class="kw">then</span> <span class="st">&#39;any&#39;</span>
+                 <span class="kw">WHEN</span> m.member_role <span class="kw">is</span> <span class="kw">null</span> <span class="kw">then</span> <span class="st">&#39;any&#39;</span>
+                 <span class="co">--handle US:US 6, North&amp;East, West&amp;South</span>
+                 <span class="kw">WHEN</span> relation_id=<span class="dv">337473</span> <span class="kw">then</span>
+                      <span class="kw">CASE</span> <span class="kw">WHEN</span> m.member_role=<span class="st">&#39;east&#39;</span> <span class="kw">then</span> <span class="st">&#39;north&#39;</span>
+                           <span class="kw">WHEN</span> m.member_role=<span class="st">&#39;west&#39;</span> <span class="kw">then</span> <span class="st">&#39;south&#39;</span>
+                           <span class="kw">ELSE</span> m.member_role
+                      <span class="kw">END</span>
+                 <span class="kw">ELSE</span> m.member_role
+            <span class="kw">END</span>
+            <span class="kw">WHEN</span> rr.direction=<span class="st">&#39;&#39;</span> <span class="kw">then</span> <span class="st">&#39;any&#39;</span>
+            <span class="kw">WHEN</span> rr.direction <span class="kw">is</span> <span class="kw">null</span> <span class="kw">then</span> <span class="st">&#39;any&#39;</span>
+            <span class="kw">ELSE</span> rr.direction
+       <span class="kw">END</span> <span class="kw">as</span> direction
+<span class="kw">into</span> tempseg.relation_direction_geometries
+<span class="kw">FROM</span> route_relations rr
+<span class="kw">JOIN</span> relation_members <span class="kw">AS</span> <span class="kw">m</span> <span class="kw">ON</span> (rr.id=m.relation_id)
+<span class="kw">JOIN</span> ways <span class="kw">AS</span> w <span class="kw">ON</span> ( member_id = w.id )
+<span class="kw">WHERE</span> npoints(linestring) &gt; <span class="dv">1</span>  <span class="co">-- has to be a line or the st_collect breaks</span>
+<span class="co">-- and relation_id=69364</span>
+<span class="kw">order</span> <span class="kw">by</span> relation_id,direction,sequence_id;
+
+
+<span class="co">-- first fix the directions of any to be all</span>
+
+<span class="kw">drop</span> <span class="kw">table</span> if <span class="kw">exists</span> tempseg.nother_table;
+<span class="kw">select</span> rdg.relation_id,rdg.sequence_id,rdg.linestring,rdg.ordering,b.direction
+<span class="kw">into</span> tempseg.nother_table
+<span class="kw">from</span> tempseg.relation_direction_geometries rdg
+<span class="kw">join</span> (<span class="kw">select</span> <span class="kw">distinct</span> relation_id,direction
+      <span class="kw">from</span> tempseg.relation_direction_geometries d
+      <span class="kw">where</span> direction != <span class="st">&#39;any&#39;</span>) b <span class="kw">on</span> (b.relation_id=rdg.relation_id)
+<span class="kw">where</span> rdg.direction=<span class="st">&#39;any&#39;</span>;
+
+<span class="co">-- Theoretically, that is every &#39;any&#39; duplicated at most</span>
+
+<span class="co">-- need to make sure I handle lines that *only* have any direction?</span>
+
+<span class="co">-- then merge those</span>
+
+<span class="co">-- first the ones in &#39;nother_table</span>
+
+<span class="kw">drop</span> <span class="kw">table</span> if <span class="kw">exists</span> tempseg.initial_routelines <span class="kw">cascade</span>;
+<span class="kw">select</span> relation_id,
+       direction,
+<span class="co">-- st_numGeometries(st_linemerge(st_collect(linestring)))</span>
+ st_linemerge(st_collect(linestring))
+ <span class="kw">as</span> linestring
+<span class="kw">into</span> tempseg.initial_routelines
+<span class="kw">from</span> (
+ <span class="kw">select</span> rdg.relation_id,
+       rdg.direction,
+       rdg.linestring,
+       rdg.sequence_id
+ <span class="kw">from</span> tempseg.relation_direction_geometries rdg
+ <span class="kw">where</span> rdg.direction != <span class="st">&#39;any&#39;</span>
+ <span class="kw">UNION</span>
+ <span class="kw">select</span> n.relation_id,
+       n.direction,
+       n.linestring,
+       n.sequence_id
+ <span class="kw">from</span> tempseg.nother_table n
+) q <span class="kw">group</span> <span class="kw">by</span> relation_id,direction;
+
+<span class="co">--  now add the &#39;any&#39; direction ones</span>
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.initial_routelines
+<span class="kw">select</span> relation_id,
+       <span class="st">&#39;both&#39;</span> <span class="kw">as</span> direction,
+<span class="co">-- st_numGeometries(st_linemerge(st_collect(linestring)))</span>
+ st_linemerge(st_collect(linestring))
+ <span class="kw">as</span> linestring
+<span class="kw">from</span> (
+ <span class="kw">select</span> rdg.relation_id,
+       rdg.direction,
+       rdg.linestring,
+       rdg.sequence_id
+ <span class="kw">from</span> tempseg.relation_direction_geometries rdg
+ <span class="kw">where</span> rdg.direction = <span class="st">&#39;any&#39;</span> and
+       rdg.relation_id <span class="kw">not</span> <span class="kw">in</span> (<span class="kw">select</span> <span class="kw">distinct</span> relation_id <span class="kw">from</span> tempseg.nother_table)
+) a
+<span class="kw">group</span> <span class="kw">by</span> relation_id, direction;
+
+<span class="co">-- okay, now clean up those multilines</span>
+
+
+<span class="kw">drop</span> <span class="kw">table</span> if <span class="kw">exists</span> tempseg.route_relations_split_lines <span class="kw">cascade</span>;
+<span class="kw">CREATE</span> <span class="kw">TABLE</span>  tempseg.route_relations_split_lines (
+  relation_id <span class="dt">bigint</span> <span class="kw">not</span> <span class="kw">null</span>,
+  direction <span class="dt">text</span>,
+  id4 <span class="dt">serial</span> <span class="kw">primary</span> <span class="kw">key</span>,
+  segment_id <span class="dt">int</span> <span class="kw">not</span> <span class="kw">null</span>
+);
+<span class="kw">SELECT</span> AddGeometryColumn( <span class="st">&#39;tempseg&#39;</span>,<span class="st">&#39;route_relations_split_lines&#39;</span>, <span class="st">&#39;routeline&#39;</span>, <span class="dv">4326</span>, <span class="st">&#39;LINESTRING&#39;</span>, <span class="dv">2</span>);
+
+<span class="co">-- truncate tempseg.route_relations_split_lines;</span>
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.route_relations_split_lines
+ (relation_id,direction,segment_id,routeline)
+<span class="kw">SELECT</span>
+  relation_id,direction,generate_series(<span class="dv">1</span>,(<span class="kw">Select</span> ST_NumGeometries(linestring))*<span class="dv">2</span>,<span class="dv">2</span>) <span class="kw">as</span> segment_id,
+ST_GeometryN(linestring, generate_series(<span class="dv">1</span>, ST_NumGeometries(linestring))) <span class="kw">AS</span> routeline
+<span class="kw">FROM</span> tempseg.initial_routelines
+<span class="kw">where</span> ST_NumGeometries(linestring) <span class="kw">is</span> <span class="kw">not</span> <span class="kw">null</span>
+<span class="co">-- and  relation_id = 70350</span>
+<span class="kw">order</span> <span class="kw">by</span> relation_id,direction
+;
+
+<span class="co">--  select distinct relation_id from tempseg.route_relations_split_lines order by relation_id;</span>
+<span class="co">--  relation_id</span>
+<span class="co">-- -------------</span>
+<span class="co">-- --        70350</span>
+<span class="co">-- --       74660</span>
+<span class="co">-- -- skipping       74885</span>
+<span class="co">-- --       76279</span>
+
+<span class="co">-- I did those above 4 on OSM, and all of them were off ramps attached</span>
+<span class="co">-- to the main relation, or wrong way segments.  So try this...just</span>
+<span class="co">-- drop all short segments</span>
+
+<span class="co">-- select relation_id,direction,segment_id,</span>
+<span class="co">--  st_length_Spheroid(</span>
+<span class="co">--      routeline,</span>
+<span class="co">--      &#39;SPHEROID[&quot;GRS_1980&quot;,6378137,298.257222101]&#39;) as llength</span>
+<span class="co">-- from tempseg.route_relations_split_lines</span>
+<span class="co">-- where relation_id in  (70350, 74660, 74885, 76279)</span>
+<span class="co">-- order by relation_id,direction,llength;</span>
+
+<span class="co">-- so, first try getting rid of lines under 500 meters</span>
+
+<span class="kw">drop</span> <span class="kw">table</span> if <span class="kw">exists</span> tempseg.fixed_relations;
+
+<span class="kw">select</span> relation_id,direction
+<span class="kw">into</span> tempseg.fixed_relations
+<span class="kw">from</span> (
+<span class="kw">select</span> GeometryType(st_linemerge(st_collect(routeline))) <span class="kw">as</span> geomtype,relation_id,direction <span class="kw">from</span> tempseg.route_relations_split_lines
+<span class="kw">group</span> <span class="kw">by</span> relation_id,direction
+<span class="kw">order</span> <span class="kw">by</span> geomtype
+)a <span class="kw">where</span> geomtype = <span class="st">&#39;LINESTRING&#39;</span>;
+
+<span class="co">-- manually ratchet up the length from 100 to 1000, I guess</span>
+
+
+<span class="kw">delete</span> <span class="kw">from</span> tempseg.route_relations_split_lines
+<span class="kw">where</span>
+(st_length_Spheroid(
+     routeline,
+     <span class="st">&#39;SPHEROID[&quot;GRS_1980&quot;,6378137,298.257222101]&#39;</span>)) &lt; <span class="dv">200</span>
+;
+
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.fixed_relations (relation_id,direction)
+<span class="kw">select</span> relation_id,direction
+<span class="kw">from</span> (
+  <span class="kw">select</span> GeometryType(
+          st_linemerge(st_collect(routeline))) <span class="kw">as</span> geomtype,
+         relation_id,direction
+  <span class="kw">from</span> tempseg.route_relations_split_lines
+  <span class="kw">left</span> <span class="kw">outer</span> <span class="kw">join</span> tempseg.fixed_relations q <span class="kw">using</span>(relation_id,direction) <span class="kw">where</span> q.relation_id <span class="kw">is</span> <span class="kw">null</span>
+  <span class="kw">group</span> <span class="kw">by</span> relation_id,direction
+  <span class="kw">order</span> <span class="kw">by</span> geomtype
+)a <span class="kw">where</span> geomtype = <span class="st">&#39;LINESTRING&#39;</span>;
+
+<span class="kw">delete</span> <span class="kw">from</span> tempseg.route_relations_split_lines
+<span class="kw">where</span>
+(st_length_Spheroid(
+     routeline,
+     <span class="st">&#39;SPHEROID[&quot;GRS_1980&quot;,6378137,298.257222101]&#39;</span>)) &lt; <span class="dv">400</span>
+;
+
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.fixed_relations (relation_id,direction)
+<span class="kw">select</span> relation_id,direction
+<span class="kw">from</span> (
+  <span class="kw">select</span> GeometryType(
+          st_linemerge(st_collect(routeline))) <span class="kw">as</span> geomtype,
+         relation_id,direction
+  <span class="kw">from</span> tempseg.route_relations_split_lines
+  <span class="kw">left</span> <span class="kw">outer</span> <span class="kw">join</span> tempseg.fixed_relations q <span class="kw">using</span>(relation_id,direction) <span class="kw">where</span> q.relation_id <span class="kw">is</span> <span class="kw">null</span>
+  <span class="kw">group</span> <span class="kw">by</span> relation_id,direction
+  <span class="kw">order</span> <span class="kw">by</span> geomtype
+)a <span class="kw">where</span> geomtype = <span class="st">&#39;LINESTRING&#39;</span>;
+
+<span class="kw">delete</span> <span class="kw">from</span> tempseg.route_relations_split_lines
+<span class="kw">where</span>
+(st_length_Spheroid(
+     routeline,
+     <span class="st">&#39;SPHEROID[&quot;GRS_1980&quot;,6378137,298.257222101]&#39;</span>)) &lt; <span class="dv">600</span>
+;
+
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.fixed_relations (relation_id,direction)
+<span class="kw">select</span> relation_id,direction
+<span class="kw">from</span> (
+  <span class="kw">select</span> GeometryType(
+          st_linemerge(st_collect(routeline))) <span class="kw">as</span> geomtype,
+         relation_id,direction
+  <span class="kw">from</span> tempseg.route_relations_split_lines
+  <span class="kw">left</span> <span class="kw">outer</span> <span class="kw">join</span> tempseg.fixed_relations q <span class="kw">using</span>(relation_id,direction) <span class="kw">where</span> q.relation_id <span class="kw">is</span> <span class="kw">null</span>
+  <span class="kw">group</span> <span class="kw">by</span> relation_id,direction
+  <span class="kw">order</span> <span class="kw">by</span> geomtype
+)a <span class="kw">where</span> geomtype = <span class="st">&#39;LINESTRING&#39;</span>;
+
+<span class="kw">delete</span> <span class="kw">from</span> tempseg.route_relations_split_lines
+<span class="kw">where</span>
+(st_length_Spheroid(
+     routeline,
+     <span class="st">&#39;SPHEROID[&quot;GRS_1980&quot;,6378137,298.257222101]&#39;</span>)) &lt; <span class="dv">800</span>
+;
+
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.fixed_relations (relation_id,direction)
+<span class="kw">select</span> relation_id,direction
+<span class="kw">from</span> (
+  <span class="kw">select</span> GeometryType(
+          st_linemerge(st_collect(routeline))) <span class="kw">as</span> geomtype,
+         relation_id,direction
+  <span class="kw">from</span> tempseg.route_relations_split_lines
+  <span class="kw">left</span> <span class="kw">outer</span> <span class="kw">join</span> tempseg.fixed_relations q <span class="kw">using</span>(relation_id,direction) <span class="kw">where</span> q.relation_id <span class="kw">is</span> <span class="kw">null</span>
+  <span class="kw">group</span> <span class="kw">by</span> relation_id,direction
+  <span class="kw">order</span> <span class="kw">by</span> geomtype
+)a <span class="kw">where</span> geomtype = <span class="st">&#39;LINESTRING&#39;</span>;
+
+<span class="co">-- select GeometryType(st_linemerge(st_collect(routeline))) as geomtype,relation_id,direction from tempseg.route_relations_split_lines</span>
+<span class="co">-- left outer join tempseg.fixed_relations q using(relation_id,direction) where q.relation_id is null</span>
+<span class="co">-- and id4 not in</span>
+<span class="co">-- ( select id4</span>
+<span class="co">--   from tempseg.route_relations_split_lines</span>
+<span class="co">--   where  (st_length_Spheroid(</span>
+<span class="co">--      routeline,</span>
+<span class="co">--      &#39;SPHEROID[&quot;GRS_1980&quot;,6378137,298.257222101]&#39;)) &lt; 900</span>
+<span class="co">-- )</span>
+<span class="co">-- group by relation_id,direction</span>
+<span class="co">-- order by geomtype;</span>
+
+
+<span class="co">-- okay, that has pretty much run out of its usefulness.  Now I need</span>
+<span class="co">-- to insert segments as needed.  My thought is for those geoms with</span>
+<span class="co">-- two or three parts, make segments to join the parts, if that</span>
+<span class="co">-- segment is less than 1km</span>
+
+<span class="co">-- how?</span>
+
+<span class="co">-- select geometry 1 of N, last point, join with first point, geometry 2 of N</span>
+
+<span class="co">-- so make a new temp table</span>
+
+<span class="kw">drop</span> <span class="kw">table</span> if <span class="kw">exists</span> tempseg.more_split_lines <span class="kw">cascade</span>;
+<span class="kw">CREATE</span> <span class="kw">TABLE</span>  tempseg.more_split_lines (
+  relation_id <span class="dt">bigint</span> <span class="kw">not</span> <span class="kw">null</span>,
+  direction <span class="dt">text</span>,
+  id4 <span class="dt">serial</span> <span class="kw">primary</span> <span class="kw">key</span>,
+  fix <span class="dt">boolean</span> <span class="kw">default</span> <span class="kw">false</span>,
+  segment_id <span class="dt">int</span> <span class="kw">not</span> <span class="kw">null</span>
+);
+<span class="kw">SELECT</span> AddGeometryColumn( <span class="st">&#39;tempseg&#39;</span>,<span class="st">&#39;more_split_lines&#39;</span>, <span class="st">&#39;routeline&#39;</span>, <span class="dv">4326</span>, <span class="st">&#39;LINESTRING&#39;</span>, <span class="dv">2</span>);
+
+
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.more_split_lines
+ (relation_id,direction,segment_id,routeline)
+<span class="kw">SELECT</span>
+  relation_id,direction,generate_series(<span class="dv">1</span>,(<span class="kw">Select</span> ST_NumGeometries(linestring))*<span class="dv">2</span>,<span class="dv">2</span>) <span class="kw">as</span> segment_id,
+ST_GeometryN(linestring, generate_series(<span class="dv">1</span>, ST_NumGeometries(linestring))) <span class="kw">AS</span> routeline
+<span class="kw">from</span> (
+  <span class="kw">select</span> st_linemerge(st_collect(routeline)) <span class="kw">as</span> linestring,
+         relation_id,direction
+  <span class="kw">from</span> tempseg.route_relations_split_lines
+  <span class="kw">left</span> <span class="kw">outer</span> <span class="kw">join</span> tempseg.fixed_relations q <span class="kw">using</span>(relation_id,direction)
+  <span class="kw">where</span> q.relation_id <span class="kw">is</span> <span class="kw">null</span>
+  <span class="kw">group</span> <span class="kw">by</span> relation_id,direction
+) b
+<span class="kw">where</span> ST_NumGeometries(linestring) <span class="kw">is</span> <span class="kw">not</span> <span class="kw">null</span>;
+
+
+
+<span class="co">-- self join, construct joining segments</span>
+
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.more_split_lines
+  (relation_id, direction, segment_id, fix,routeline)
+  <span class="kw">select</span> rl1.relation_id, rl1.direction,rl1.segment_id + <span class="dv">1</span> <span class="kw">as</span> segment_id,
+       <span class="kw">true</span> <span class="kw">as</span> fix,
+       st_makeline(
+             st_endpoint(rl1.routeline),
+             st_startpoint(rl2.routeline)
+       ) <span class="kw">as</span> routeline
+  <span class="kw">from</span> tempseg.more_split_lines rl1
+  <span class="kw">join</span> tempseg.more_split_lines rl2
+       <span class="kw">on</span> (rl1.relation_id=rl2.relation_id
+           and rl1.direction = rl2.direction
+           and rl1.segment_id + <span class="dv">2</span> = rl2.segment_id
+          )
+  <span class="kw">where</span> <span class="kw">not</span> ST_equals(st_endpoint(rl1.routeline),
+             st_startpoint(rl2.routeline))
+  and ST_Distance_Sphere(st_endpoint(rl1.routeline),
+             st_startpoint(rl2.routeline)) &lt; <span class="dv">1000</span>
+;
+
+<span class="co">-- select  GeometryType(st_linemerge(st_collect(routeline))) as geomtype,</span>
+<span class="co">--        relation_id,direction</span>
+<span class="co">-- from tempseg.more_split_lines</span>
+<span class="co">-- group by relation_id,direction</span>
+<span class="co">-- order by geomtype;</span>
+
+<span class="co">-- Okay, that is as good as I can get for now</span>
+
+<span class="kw">drop</span> <span class="kw">table</span> if <span class="kw">exists</span> tempseg.revised_route_lines <span class="kw">cascade</span>;
+<span class="kw">CREATE</span> <span class="kw">TABLE</span>  tempseg.revised_route_lines (
+  relation_id <span class="dt">bigint</span> <span class="kw">not</span> <span class="kw">null</span>,
+  direction <span class="dt">text</span>,
+  id4 <span class="dt">serial</span> <span class="kw">primary</span> <span class="kw">key</span>,
+  <span class="kw">unique</span> (relation_id,direction)
+);
+<span class="kw">SELECT</span> AddGeometryColumn( <span class="st">&#39;tempseg&#39;</span>,<span class="st">&#39;revised_route_lines&#39;</span>, <span class="st">&#39;routeline&#39;</span>, <span class="dv">4326</span>, <span class="st">&#39;GEOMETRY&#39;</span>, <span class="dv">2</span>);
+
+
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.revised_route_lines
+(routeline,relation_id,direction)
+<span class="kw">select</span>  st_linemerge(st_collect(routeline)),
+       relation_id,direction
+<span class="kw">from</span> tempseg.more_split_lines
+<span class="kw">group</span> <span class="kw">by</span> relation_id,direction;
+
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.revised_route_lines
+(routeline,relation_id,direction)
+<span class="kw">select</span> st_linemerge(st_collect(routeline)),
+       relation_id,direction
+<span class="kw">from</span> tempseg.route_relations_split_lines
+<span class="kw">join</span> tempseg.fixed_relations q <span class="kw">using</span>(relation_id,direction)
+<span class="kw">group</span> <span class="kw">by</span> relation_id,direction;
+
+
+<span class="kw">insert</span> <span class="kw">into</span> tempseg.revised_route_lines
+(routeline,relation_id,direction)
+<span class="kw">select</span> linestring,relation_id,direction
+<span class="kw">from</span> tempseg.initial_routelines
+<span class="kw">where</span> geometrytype(linestring)=<span class="st">&#39;LINESTRING&#39;</span>;</code></pre></div>
+</section>
+<section id="after" class="slide level1">
+<h1>After</h1>
+</section>
+<section id="revised_route_linessqitch.plan" class="slide level1">
+<h1>revised_route_lines/sqitch.plan</h1>
+<pre><code>%syntax-version=1.0.0
+%project=revised_route_lines
+%uri=https://github.com/jmarca/revised_route_lines
+
+tempseg_schema 2016-04-14T23:38:28Z James E. Marca &lt;james@activimetrics.com&gt; # schema for temp segment work
+rdg_seq [osm_via_osmosis:route_relations] 2016-04-14T23:24:30Z James E. Marca &lt;james@activimetrics.com&gt; # sequence for relation direction geometries table
+rdg [tempseg_schema rdg_seq] 2016-04-14T23:44:06Z James E. Marca &lt;james@activimetrics.com&gt; # relation-direction-geometries utility table
+initial_routelines [tempseg_schema rdg] 2016-04-15T00:00:11Z James E. Marca &lt;james@activimetrics.com&gt; # initial_routelines utility table
+split_lines [initial_routelines] 2016-04-15T05:01:17Z James E. Marca &lt;james@activimetrics.com&gt; # first split lines table
+fixed_relations [split_lines] 2016-04-15T05:22:29Z James E. Marca &lt;james@activimetrics.com&gt; # fixed split relations
+more_splits [fixed_relations split_lines] 2016-04-15T06:28:42Z James E. Marca &lt;james@activimetrics.com&gt; # more split lines working table
+rsl [more_splits fixed_relations split_lines] 2016-04-15T06:43:41Z James E. Marca &lt;james@activimetrics.com&gt; # revised route lines</code></pre>
+</section>
+<section id="revised_route_linesdeployrsl" class="slide level1">
+<h1>revised_route_lines/deploy/rsl</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="co">-- Deploy revised_route_lines:rsl to pg</span>
+<span class="co">-- requires: more_splits</span>
+<span class="co">-- requires: fixed_relations</span>
+<span class="co">-- requires: split_lines</span>
+
+<span class="kw">BEGIN</span>;
+
+<span class="kw">CREATE</span> <span class="kw">TABLE</span>  tempseg.revised_route_lines (
+  relation_id <span class="dt">bigint</span> <span class="kw">not</span> <span class="kw">null</span>,
+  direction <span class="dt">text</span>,
+  id4 <span class="dt">serial</span> <span class="kw">primary</span> <span class="kw">key</span>,
+  <span class="kw">unique</span> (relation_id,direction)
+);
+<span class="kw">SELECT</span> AddGeometryColumn( <span class="st">&#39;tempseg&#39;</span>,<span class="st">&#39;revised_route_lines&#39;</span>, <span class="st">&#39;routeline&#39;</span>,
+                          <span class="dv">4326</span>, <span class="st">&#39;GEOMETRY&#39;</span>, <span class="dv">2</span>);
+
+<span class="kw">INSERT</span> <span class="kw">INTO</span> tempseg.revised_route_lines
+            (routeline,relation_id,direction)
+<span class="kw">SELECT</span>
+        ST_linemerge(ST_collect(routeline)),
+        relation_id,direction
+<span class="kw">FROM</span> tempseg.more_split_lines
+<span class="kw">GROUP</span> <span class="kw">BY</span> relation_id,direction;
+
+<span class="kw">INSERT</span> <span class="kw">INTO</span> tempseg.revised_route_lines
+            (routeline,relation_id,direction)
+<span class="kw">SELECT</span> ST_linemerge(ST_collect(routeline)),
+       relation_id,direction
+<span class="kw">FROM</span> tempseg.route_relations_split_lines
+<span class="kw">JOIN</span> tempseg.fixed_relations q <span class="kw">USING</span>(relation_id,direction)
+<span class="kw">GROUP</span> <span class="kw">BY</span> relation_id,direction;
+
+
+<span class="kw">INSERT</span> <span class="kw">INTO</span> tempseg.revised_route_lines
+            (routeline,relation_id,direction)
+<span class="kw">SELECT</span> linestring,relation_id,direction
+<span class="kw">FROM</span> tempseg.initial_routelines
+<span class="kw">LEFT</span> <span class="kw">OUTER</span> <span class="kw">JOIN</span> tempseg.revised_route_lines rrl <span class="kw">using</span>(relation_id,direction)
+<span class="kw">WHERE</span> geometrytype(linestring)=<span class="st">&#39;LINESTRING&#39;</span>
+AND rrl.relation_id <span class="kw">IS</span> <span class="kw">NULL</span>;
+
+<span class="kw">COMMIT</span>;</code></pre></div>
+</section>
+<section id="example-test" class="slide level1">
+<h1>Example test</h1>
+<div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">PREPARE</span> tallyup <span class="kw">AS</span>
+   <span class="kw">SELECT</span> <span class="kw">count</span>(*)<span class="ch">::</span>integer
+   <span class="kw">FROM</span> tempseg.route_relations_split_lines;
+
+<span class="kw">PREPARE</span> this_or_that <span class="kw">AS</span>
+   <span class="kw">SELECT</span> <span class="kw">CASE</span>
+            <span class="kw">WHEN</span> <span class="kw">exists</span>(<span class="kw">SELECT</span> tablename
+                        <span class="kw">FROM</span> pg_tables
+                        <span class="kw">WHERE</span> schemaname=<span class="st">&#39;tempseg&#39;</span>
+                          AND tablename=<span class="st">&#39;fixed_relations&#39;</span>)
+            <span class="kw">THEN</span> <span class="dv">1884</span>
+            <span class="kw">ELSE</span> <span class="dv">2799</span>
+            <span class="kw">END</span>;
+
+<span class="kw">SELECT</span> results_eq(<span class="st">&#39;tallyup&#39;</span>, <span class="st">&#39;this_or_that&#39;</span>,
+                  <span class="st">&#39;The data got loaded okay&#39;</span>);</code></pre></div>
+</section>
+<section id="sqitch-and-pgtap-are-great" class="slide level1">
+<h1>Sqitch and pgTAP are great</h1>
+</section>
+<section id="itches" class="slide level1">
+<h1>“Itches”</h1>
+<ol type="1">
+<li>verify != test
+<ul>
+<li>I want to put pgTAP tests into the verify scripts</li>
+<li>Instead, need to write SQL that will fail</li>
+</ul></li>
+<li>Dependencies are checked at deploy time</li>
+<li>Can’t automatically deploy dependencies</li>
+</ol>
+</section>
+<section class="slide level1">
+
+<figure>
+<img src="./figures/npm_the_things.jpg" />
+</figure>
+</section>
+<section id="my-plans" class="slide level1">
+<h1>My plans</h1>
+<ul>
+<li>npm run-scripts to deploy, verify, test</li>
+<li>npm run-scripts to fetch dependencies</li>
+<li>npm run-scripts to deploy dependencies</li>
+<li>stop using mocha; switch to node-tap</li>
+</ul>
+</section>
+<section id="thank-you" class="slide level1">
+<h1>Thank you</h1>
 </section>
     </div>
   </div>
