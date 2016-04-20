@@ -610,7 +610,7 @@ SELECT col_is_pk('public', 'wim_points_4269','wim_id', 'geom points 4269 gid is 
 
 # Indexes or Indices?
 
-* use `indexes_are(:schema,:table,ARRAY[:indexes],:description)
+* use `indexes_are(:schema,:table,ARRAY[:indexes],:description)`
 * Don't forget the list of indices is an ARRAY
 
 ```sqlpostgresql
@@ -651,7 +651,6 @@ SELECT fk_ok(
     'public','wim_points_4269','gid',
     'wim_points_4269 connects to geom_points_4269'
 );
-
 
 -- 4326
 SELECT fk_ok(
@@ -1058,19 +1057,15 @@ Deploying tvd:tvd will fail unless dependencies are met
 # Clean up task
 
 * Pretty tedious
-* Pick apart scripts into chunks
-    * copying data
-    * deploying OpenStreetMap
-    * cleaning up route relations
-    * etc
-* Convert chunks into sqitch changes
-    * clear dependencies on other packages
-    * generally multiple changes per package
-    * Write verify, test, revert sql
+* Pick apart scripts into logical chunks
+* Convert chunks into sqitch packages
+    * further decomposition into changes
+    * clear dependencies on other packages' changes
+    * Always write verify
+    * Usually write tests
 * Deploy each package to the database
 * Verify and test with each deployed change
 
-# Example
 
 # Before
 

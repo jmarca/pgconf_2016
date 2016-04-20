@@ -714,7 +714,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <section id="indexes-or-indices" class="slide level1">
 <h1>Indexes or Indices?</h1>
 <ul>
-<li>use `indexes_are(:schema,:table,ARRAY[:indexes],:description)</li>
+<li>use <code>indexes_are(:schema,:table,ARRAY[:indexes],:description)</code></li>
 <li>Don’t forget the list of indices is an ARRAY</li>
 </ul>
 <div class="sourceCode"><pre class="sourceCode sqlpostgresql"><code class="sourceCode sqlpostgresql"><span class="kw">SELECT</span> indexes_are(<span class="st">&#39;public&#39;</span>, <span class="st">&#39;wim_stations&#39;</span>,
@@ -748,7 +748,6 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
     <span class="st">&#39;public&#39;</span>,<span class="st">&#39;wim_points_4269&#39;</span>,<span class="st">&#39;gid&#39;</span>,
     <span class="st">&#39;wim_points_4269 connects to geom_points_4269&#39;</span>
 );
-
 
 <span class="co">-- 4326</span>
 <span class="kw">SELECT</span> fk_ok(
@@ -1145,25 +1144,17 @@ populate_tvd [tvd] 2016-04-11T18:36:17Z James E. Marca &lt;james@activimetrics.c
 <h1>Clean up task</h1>
 <ul>
 <li>Pretty tedious</li>
-<li>Pick apart scripts into chunks
+<li>Pick apart scripts into logical chunks</li>
+<li>Convert chunks into sqitch packages
 <ul>
-<li>copying data</li>
-<li>deploying OpenStreetMap</li>
-<li>cleaning up route relations</li>
-<li>etc</li>
-</ul></li>
-<li>Convert chunks into sqitch changes
-<ul>
-<li>clear dependencies on other packages</li>
-<li>generally multiple changes per package</li>
-<li>Write verify, test, revert sql</li>
+<li>further decomposition into changes</li>
+<li>clear dependencies on other packages’ changes</li>
+<li>Always write verify</li>
+<li>Usually write tests</li>
 </ul></li>
 <li>Deploy each package to the database</li>
 <li>Verify and test with each deployed change</li>
 </ul>
-</section>
-<section id="example" class="slide level1">
-<h1>Example</h1>
 </section>
 <section id="before" class="slide level1">
 <h1>Before</h1>
