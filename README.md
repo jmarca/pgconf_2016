@@ -11,7 +11,7 @@ SQL is included in the presentation in a code block.  The outcome of
 the edits described in this presentation are mostly included in the
 repo
 
-https://github.com/jmarca/update_detectors_osm
+<https://github.com/jmarca/update_detectors_osm>
 
 That repo describes that npm install can be used to download the
 dependent sqitch-based packages, that all need to be individually
