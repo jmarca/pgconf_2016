@@ -1,1 +1,0 @@
-/home/james/repos/reveal.js
