@@ -783,7 +783,7 @@ SELECT results_eq(
 
 # Sqitch documentation is great
 
-Really.  Its superb.
+Really.  It's superb.
 
 
 # Sqitch "Hello World"
