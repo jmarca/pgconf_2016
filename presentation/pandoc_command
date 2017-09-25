@@ -1,2 +1,1 @@
-pandoc -t revealjs -s final_present.md -o arterial.html --standalone --slide-level=2 -V theme=swisscoffee -S
-
+pandoc -t revealjs -s pgconf.md -o pgconf2.html --standalone  -V theme=sky -V transition=fade -V width=1269 -S
