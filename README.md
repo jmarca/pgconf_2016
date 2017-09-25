@@ -2,4 +2,4 @@
 
 This is the repo for my pgconf 2016 presentation
 
-Notes and such at the moment
+The presentation is [here](./presentation/pgconf.html)
